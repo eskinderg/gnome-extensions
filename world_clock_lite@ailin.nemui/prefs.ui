@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <requires lib="gtk" version="4.0"/>
+  <requires lib="libadwaita" version="1.4"/>
+  <object class="GtkAdjustment" id="num-adj">
+    <property name="upper">100</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="GtkAdjustment" id="num-adj2">
+    <property name="upper">100</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
+  </object>
+  <object class="AdwPreferencesPage" id="content-table">
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwActionRow" id="position-l">
+            <property name="title" translatable="yes">Panel position</property>
+            <child>
+              <object class="GtkGrid" id="positions-bb">
+                <property name="can_focus">1</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+                <property name="css-classes">linked</property>
+                <child>
+                  <object class="GtkToggleButton" id="position-LR">
+                    <property name="label">◂</property>
+                    <property name="receives_default">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkToggleButton" id="position-ML">
+                    <property name="label">◃</property>
+                    <property name="receives_default">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkToggleButton" id="position-M1">
+                    <property name="label">▮</property>
+                    <property name="receives_default">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkToggleButton" id="position-MR">
+                    <property name="label">▹</property>
+                    <property name="receives_default">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkToggleButton" id="position-RL">
+                    <property name="label">▸</property>
+                    <property name="receives_default">1</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="AdwActionRow" id="num-l">
+            <property name="title" translatable="yes">Number of clocks</property>
+            <property name="css-classes">spin</property>
+            <child>
+              <object class="GtkBox" id="nums-b">
+                <property name="can_focus">1</property>
+                <child>
+                  <object class="GtkSpinButton" id="num-sp">
+                    <property name="xalign">1</property>
+                    <property name="adjustment">num-adj</property>
+                    <property name="numeric">1</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="num-sp2">
+                    <property name="xalign">1</property>
+                    <property name="adjustment">num-adj2</property>
+                    <property name="numeric">1</property>
+                    <property name="margin-start">26</property>
+                  </object>
+                </child>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwSwitchRow" id="local-cb">
+            <property name="title" translatable="yes">Hide local time</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwSwitchRow" id="show-city-cb">
+            <property name="title" translatable="yes">Location instead of time zone in panel</property>
+          </object>
+        </child>
+        <child>
+          <object class="AdwSwitchRow" id="opaque-cb">
+            <property name="title" translatable="yes">Display additional time as opaque</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
+          <object class="AdwActionRow">
+            <child>
+              <object class="GtkButton" id="open-gnome-clocks">
+                <property name="label">Edit World Clocks in "Clocks"...</property>
+                <property name="halign">center</property>
+                <property name="valign">center</property>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
