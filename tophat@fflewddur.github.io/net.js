@@ -29,6 +29,7 @@ export const NetMonitor = GObject.registerClass(class NetMonitor extends TopHatM
     usageUnit;
     nmClient;
     connectivity;
+    connectivitySig = 0;
     constructor(metadata, gsettings) {
         super('Net Monitor', metadata, gsettings);
         const gicon = Gio.icon_new_for_string(`${this.metadata.path}/icons/hicolor/scalable/actions/net-icon-symbolic.svg`);
@@ -87,7 +88,7 @@ export const NetMonitor = GObject.registerClass(class NetMonitor extends TopHatM
             client.check_connectivity_async(null, (client, result) => {
                 this.updateConnectivity(client, result);
             });
-            client.connect('notify::connectivity', () => {
+            this.connectivitySig = client.connect('notify::connectivity', () => {
                 client.check_connectivity_async(null, (client, result) => {
                     this.updateConnectivity(client, result);
                 });
@@ -223,6 +224,10 @@ export const NetMonitor = GObject.registerClass(class NetMonitor extends TopHatM
     }
     destroy() {
         // console.log('NetMonitor.destroy()');
+        if (this.connectivitySig > 0) {
+            this.nmClient?.disconnect(this.connectivitySig);
+            this.connectivitySig = 0;
+        }
         this.nmClient = undefined;
         super.destroy();
     }

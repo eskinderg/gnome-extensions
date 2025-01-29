@@ -73,7 +73,6 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
         this.historyChart = null;
         this.icon = new St.Icon({
             style_class: 'system-status-icon tophat-panel-icon',
-            // icon_name: 'emblem-default-symbolic',
         });
         this.add_child(this.icon);
         this.meter = new TopHatMeter();
@@ -168,6 +167,9 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
         this.addMenuRow(this.menuActionBox, 0, this.menuNumCols, 1);
         this.menuActionBox.visible =
             this.gsettings.get_boolean('show-menu-actions');
+        this.menu.connectObject('open-state-changed', (_, open) => {
+            this.vitals?.detailsNeededInUI(open);
+        });
     }
     addMenuRow(widget, col, colSpan, rowSpan) {
         this.menuLayout?.attach(widget, col, this.menuRow, colSpan, rowSpan);

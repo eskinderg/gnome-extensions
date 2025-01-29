@@ -10,12 +10,13 @@
 // GNU General Public License for more details.
 // You should have received a copy of the GNU General Public License
 // along with TopHat. If not, see <https://www.gnu.org/licenses/>.
-import GObject from 'gi://GObject';
-import Cogl from 'gi://Cogl';
 import Clutter from 'gi://Clutter';
+import Cogl from 'gi://Cogl';
+import GObject from 'gi://GObject';
 import St from 'gi://St';
 import { adjustAnimationTime } from 'resource:///org/gnome/shell/misc/animationUtils.js';
-export const AnimationDuration = 200;
+export const AnimationDuration = 250;
+export const AnimationEasing = Clutter.AnimationMode.LINEAR;
 export var Orientation;
 (function (Orientation) {
     Orientation[Orientation["Horizontal"] = 0] = "Horizontal";
@@ -112,20 +113,17 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
         if (n.length != this.bars.length) {
             console.warn(`[TopHat] called setBarSizes() with ${n.length} values for ${this.bars.length} bars`);
         }
-        const meterHeight = this.get_height() - 2 * this.scaleFactor; // Subtract margin of 1px
+        const meterHeight = this.get_height();
         const duration = adjustAnimationTime(AnimationDuration);
         for (let i = 0; i < n.length; i++) {
             const height = Math.ceil(meterHeight * n[i]);
             const curHeight = this.bars[i].height;
-            // console.log(
-            //   `meter: curHeight=${curHeight} height=${height} (meterHeight=${meterHeight} * usage=${n[i]})`
-            // );
             const delta = Math.abs(height - curHeight);
             this.bars[i].remove_transition('scaleHeight');
-            if (duration > 0 && delta > 2) {
+            if (duration > 0 && delta > 1) {
                 const t = Clutter.PropertyTransition.new_for_actor(this.bars[i], 'height');
+                t.set_progress_mode(AnimationEasing);
                 t.set_duration(duration);
-                t.set_from(curHeight);
                 t.set_to(height);
                 t.set_remove_on_complete(true);
                 this.bars[i].add_transition('scaleHeight', t);
