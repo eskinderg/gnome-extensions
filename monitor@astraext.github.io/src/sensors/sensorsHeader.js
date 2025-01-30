@@ -29,6 +29,7 @@ import Config from '../config.js';
 import Utils from '../utils/utils.js';
 import Grid from '../grid.js';
 import SensorsMenu from './sensorsMenu.js';
+import SensorBars from './sensorBars.js';
 import MenuBase from '../menu.js';
 export default GObject.registerClass(class SensorsHeader extends Header {
     constructor() {
@@ -38,6 +39,7 @@ export default GObject.registerClass(class SensorsHeader extends Header {
         this.maxWidths2 = [];
         this.buildIcon();
         this.buildValues();
+        this.buildBar();
         this.addOrReorderIndicators();
         const menu = new SensorsMenu(this, 0.5, MenuBase.arrowAlignement);
         this.setMenu(menu);
@@ -63,12 +65,16 @@ export default GObject.registerClass(class SensorsHeader extends Header {
     }
     addOrReorderIndicators() {
         const indicators = Utils.getIndicatorsOrder('sensors');
+        indicators.unshift('bar');
         let position = 0;
         for (const indicator of indicators) {
             let widget;
             switch (indicator) {
                 case 'icon':
                     widget = this.icon;
+                    break;
+                case 'bar':
+                    widget = this.bar;
                     break;
                 case 'value':
                     widget = this.valuesContainer;
@@ -90,6 +96,44 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             return;
         this.fixContainerStyle();
     }
+
+    buildBar() {
+
+        if (this.bar) {
+            this.remove_child(this.bar);
+            Config.clear(this.bar);
+            Utils.memoryMonitor.unlisten(this.bar);
+            this.bar.destroy();
+        }
+
+        this.bar = new SensorBars({
+            layout: 'horizontal',
+            header: true,
+            mini: true,
+            width: 70,
+            height: 0.8,
+            breakdownConfig: 'memory-header-bars-breakdown',
+        });
+
+      Utils.sensorsMonitor.listen(this.bar, 'sensorsData', this.updateBar.bind(this));
+
+    }
+
+    updateBar() {
+      // const usage = Utils.processorMonitor.getCurrentValue('cpuUsage');
+            // Utils.processorMonitor.listen(this.bars, 'cpuUsage', this.updateBars.bind(this));
+      const sensorsData = Utils.sensorsMonitor.getCurrentValue('sensorsData');
+        if (sensorsData) {
+          let sensor1;
+          const sensor1Source = Config.get_json('sensors-header-sensor1');
+          const sensor1Digits = Config.get_int('sensors-header-sensor1-digits');
+          sensor1 = this.applySource(sensorsData, sensor1Source, sensor1Digits);
+          this.bar.setUsage([{user:100,total:parseInt(sensor1)}]);
+        }
+        // this.bar.setUsage([{user:100,total:100}]);
+
+    }
+
     buildIcon() {
         const defaultStyle = 'margin-left:2px;margin-right:4px;';
         let iconSize = Config.get_int('sensors-header-icon-size');

@@ -172,7 +172,7 @@ export default GObject.registerClass(class ProcessorHeader extends Header {
             header: true,
             layout: 'horizontal',
             mini: true,
-            width: 375,
+            width: 300,
             height: 0.8,
             breakdownConfig: 'processor-header-bars-breakdown',
         });
