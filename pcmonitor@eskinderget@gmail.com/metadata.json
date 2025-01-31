@@ -1,0 +1,9 @@
+{
+  "name": "Pc Monitor",
+  "description": "Monitors your hardwares",
+  "uuid": "pcmonitor@eskinderget@gmail.com",
+  "settings-schema": "org.gnome.shell.extensions.pc-monitor",
+  "shell-version": [
+    "47"
+  ]
+}
