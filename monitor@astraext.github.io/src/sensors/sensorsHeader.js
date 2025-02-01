@@ -110,7 +110,7 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             layout: 'horizontal',
             header: true,
             mini: true,
-            width: 70,
+            width: 40,
             height: 0.8,
             breakdownConfig: 'memory-header-bars-breakdown',
         });
