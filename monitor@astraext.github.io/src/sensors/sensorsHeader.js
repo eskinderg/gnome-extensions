@@ -249,7 +249,7 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             this.sensorLabel1.text = sensor1;
             this.sensorLabel2.visible = false;
         }
-        this.fixContainerStyle();
+        this.fixContainerStyle(sensor1);
     }
     applySource(sensorsData, sensorSource, sensorDigits = -1) {
         if (!sensorSource || !sensorSource.service)
@@ -298,7 +298,7 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             value = value.toFixed(1);
         return value;
     }
-    fixContainerStyle() {
+    fixContainerStyle(sensor1) {
         if (!this.valuesContainer.get_parent())
             return;
         if (!this.sensorLabel1.get_parent())
@@ -310,8 +310,18 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             const fontSize = Config.get_int('headers-font-size');
             if (fontSize)
                 defaultStyle = `font-size:${fontSize}px;`;
-            if (this.sensorsNum === 1 || this.sensorsLayout === 'horizontal')
-                return fontSize ? defaultStyle : 'font-size:1em;';
+            if (this.sensorsNum === 1 || this.sensorsLayout === 'horizontal'){
+                if(parseInt(sensor1) > 65){
+                  const iconStyle = 'margin-left:2px;margin-right:4px;';
+                  this.icon.style = iconStyle + 'color: red;';
+                  return fontSize ? defaultStyle : 'font-size:1em; color: red;';
+                }
+                else {
+                  const iconStyle = 'margin-left:2px;margin-right:4px;';
+                  this.icon.style = iconStyle;
+                  return fontSize ? defaultStyle : 'font-size:1em;';
+                }
+            }
             const superHeight = this.valuesContainer.get_parent()?.get_allocation_box()?.get_height() ?? 0;
             let scaledHeight = superHeight / this.scaleFactor;
             if (scaledHeight <= 20)
