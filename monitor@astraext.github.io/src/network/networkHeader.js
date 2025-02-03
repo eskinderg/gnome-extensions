@@ -173,21 +173,39 @@ export default GObject.registerClass(class NetworkHeader extends Header {
     buildSpeed() {
         this.speedContainer = new St.BoxLayout({
             xAlign: Clutter.ActorAlign.START,
-            yAlign: Clutter.ActorAlign.FILL,
+            yAlign: Clutter.ActorAlign.START,
             yExpand: true,
-            vertical: true,
-            width: 1,
+            xExpand: true,
+            style: 'border: none; color: white; padding:0; margin:0;',
+            width:55
         });
         this.speed = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-size: 0.65em;',
-            yAlign: Clutter.ActorAlign.CENTER,
-            xAlign: Clutter.ActorAlign.END,
+            style: 'font-size: 12px; font-weight:bold; border: none; padding:0; margin:0;',
+            yAlign: Clutter.ActorAlign.START,
+            xAlign: Clutter.ActorAlign.START,
             xExpand: true,
             yExpand: true,
+            width:55
         });
+
+        this.speed2 = new St.Label({
+            text: '',
+            styleClass: 'astra-monitor-header-speed-label',
+            style: 'font-size: 9.5px; font-weight: bold; border: none; padding:0; margin:0;',
+            yAlign: Clutter.ActorAlign.CENTER,
+            xAlign: Clutter.ActorAlign.START,
+            xExpand: true,
+            yExpand: true,
+            width:55
+        });
+
+        this.speedContainer.set_vertical(true);
+      
         this.speedContainer.add_child(this.speed);
+        this.speedContainer.add_child(this.speed2);
+
         Config.bind('network-header-io', this.speedContainer, 'visible', Gio.SettingsBindFlags.GET);
         Utils.networkMonitor.listen(this.speedContainer, 'networkIO', this.updateSpeed.bind(this));
     }
@@ -199,6 +217,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         let upload = Utils.zeroStr + ' B/s';
         let download = Utils.zeroStr + ' B/s';
         const usage = Utils.networkMonitor.getCurrentValue('networkIO');
+        // console.log(Math.trunc(usage.bytesDownloadedPerSec/1000));
         if (usage) {
             let bytesUploadedPerSec = usage.bytesUploadedPerSec;
             let bytesDownloadedPerSec = usage.bytesDownloadedPerSec;
@@ -213,39 +232,65 @@ export default GObject.registerClass(class NetworkHeader extends Header {
             upload = Utils.formatBytesPerSec(bytesUploadedPerSec, unit, maxFigures, true);
             download = Utils.formatBytesPerSec(bytesDownloadedPerSec, unit, maxFigures, true);
         }
+        let downloadSpeed = Math.trunc(usage.bytesDownloadedPerSec/1000);
+        let uploadSpeed = Math.trunc(usage.bytesUploadedPerSec/1000);
         if (this.ioLayout === 'horizontal')
-            this.speed.text = `${upload} | ${download}`;
-        else
-            this.speed.text = `${upload}\n${download}`;
+            this.speed.text = `${download} | ${upload}`;
+        else {
+            // this.speed.text = `${download}\n${upload}`;
+          if(downloadSpeed > 1)
+            this.speed.text = `${this.formatSpeed(usage.bytesDownloadedPerSec)}`;
+          else
+            this.speed.text = '0 KB/s';
+
+          if(uploadSpeed > 1)
+            this.speed2.text = `${this.formatSpeed(usage.bytesUploadedPerSec)}`;
+          else
+            this.speed2.text = '0 KB/s';
+        }
         this.fixSpeedContainerStyle();
     }
+
+    formatSpeed(bytesPerSec) {
+        if (bytesPerSec <= 0) return "0 B/s";
+
+        const units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
+        let index = Math.min(Math.floor(Math.log2(bytesPerSec) / 10), units.length - 1);
+        let speed = bytesPerSec / (1 << (index * 10));
+
+        let formattedSpeed = (index === 1) ? Math.round(speed) : (index === 2 ? speed.toFixed(1) : speed.toFixed(2));
+
+        return `${formattedSpeed} ${units[index]}`;
+    }
+
     fixSpeedContainerStyle() {
         if (!this.speedContainer.get_parent())
             return;
         if (!this.speed.get_parent())
             return;
-        const calculateStyle = () => {
-            let defaultStyle = 'font-size:0.65em;';
-            const fontSize = Config.get_int('headers-font-size');
-            if (fontSize)
-                defaultStyle = `font-size:${fontSize}px;`;
-            if (this.ioLayout === 'horizontal')
-                return fontSize ? defaultStyle : 'font-size:1em';
-            const superHeight = this.speedContainer.get_parent()?.get_allocation_box()?.get_height() ?? 0;
-            let scaledHeight = superHeight / this.scaleFactor;
-            if (scaledHeight <= 20)
-                return defaultStyle;
-            scaledHeight = Math.round(scaledHeight / 3);
-            if (fontSize && fontSize < scaledHeight)
-                return defaultStyle;
-            return `font-size:${scaledHeight}px;`;
-        };
-        const style = calculateStyle();
-        if (this.speed.style !== style) {
-            this.speed.style = style;
-            this.speed.queue_relayout();
-            this.speedContainer.queue_relayout();
-        }
+        // const calculateStyle = () => {
+        //     let defaultStyle = 'font-size:14px;';
+        //     // const fontSize = Config.get_int('headers-font-size');
+        //     const fontSize = 15;
+        //     if (fontSize)
+        //         defaultStyle = `font-size:${fontSize}px;`;
+        //     if (this.ioLayout === 'horizontal')
+        //         return fontSize ? defaultStyle : 'font-size:14px';
+        //     const superHeight = this.speedContainer.get_parent()?.get_allocation_box()?.get_height() ?? 0;
+        //     let scaledHeight = superHeight / this.scaleFactor;
+        //     if (scaledHeight <= 20)
+        //         return defaultStyle;
+        //     scaledHeight = Math.round(scaledHeight / 3);
+        //     if (fontSize && fontSize < scaledHeight)
+        //         return defaultStyle;
+        //     return `font-size:14px;`;
+        // };
+        // const style = calculateStyle();
+        // if (this.speed.style !== style) {
+        //     this.speed.style = style;
+        //     this.speed.queue_relayout();
+        //     this.speedContainer.queue_relayout();
+        // }
         const speedWidth = this.speed.get_preferred_width(-1);
         const width = speedWidth ? speedWidth[1] : 0;
         this.maxWidths.push(width);

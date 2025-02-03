@@ -57,6 +57,13 @@ export default class NetworkMonitor extends Monitor {
         });
         Config.connect(this, 'changed::network-update', this.restart.bind(this));
         this.ignored = Config.get_json('network-ignored');
+        this.ignored = [];
+        // this.ignored.push("enp0s31f6");
+        this.ignored.push("nm-bridge");
+        this.ignored.push("lo");
+        this.ignored.push("vnet0");
+        // console.log(this.ignored)
+
         if (this.ignored === null || !Array.isArray(this.ignored))
             this.ignored = [];
         Config.connect(this, 'changed::network-ignored', () => {

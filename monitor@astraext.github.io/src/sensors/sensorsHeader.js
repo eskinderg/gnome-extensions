@@ -354,7 +354,7 @@ export default GObject.registerClass(class SensorsHeader extends Header {
         // if (this.sensorLabel1.style !== style || this.sensorLabel2.style !== style) {
             this.sensorLabel1.style = style;
             this.sensorLabel2.style = this.sensor2Style();
-            console.log(this.sensorLabel2.style);
+            // console.log(this.sensorLabel2.style);
             // this.sensorLabel1.queue_relayout();
             // this.sensorLabel2.queue_relayout();
             // this.valuesContainer.queue_relayout();
