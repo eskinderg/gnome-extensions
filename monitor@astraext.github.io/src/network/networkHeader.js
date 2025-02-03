@@ -173,37 +173,47 @@ export default GObject.registerClass(class NetworkHeader extends Header {
     buildSpeed() {
         this.speedContainer = new St.BoxLayout({
             xAlign: Clutter.ActorAlign.START,
-            yAlign: Clutter.ActorAlign.START,
+            yAlign: Clutter.ActorAlign.CENTER,
             yExpand: true,
             xExpand: true,
-            style: 'border: none; color: white; padding:0; margin:0;',
-            width:55
         });
         this.speed = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-size: 12px; font-weight:bold; border: none; padding:0; margin:0;',
-            yAlign: Clutter.ActorAlign.START,
+            style: 'font-weight:bold; border: none; padding:0; margin:0; text-align:right;',
+            yAlign: Clutter.ActorAlign.CENTER,
+            xAlign: Clutter.ActorAlign.END,
+            xExpand: true,
+            yExpand: true,
+            width:80
+        });
+
+        this.sep = new St.Label({
+            text: '|',
+            styleClass: 'astra-monitor-header-speed-label',
+            style: 'font-weight:bold; text-align: center; border: none; padding:0; margin: 0 5px 0 5px;',
+            yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.START,
             xExpand: true,
             yExpand: true,
-            width:55
+            width:20
         });
 
         this.speed2 = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-size: 9.5px; font-weight: bold; border: none; padding:0; margin:0;',
+            style: 'font-size: 12px; font-weight: bold; border: none; padding:0; margin:0; text-align:left;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.START,
             xExpand: true,
             yExpand: true,
-            width:55
+            width:60
         });
 
-        this.speedContainer.set_vertical(true);
+        this.speedContainer.set_vertical(false);
       
         this.speedContainer.add_child(this.speed);
+        this.speedContainer.add_child(this.sep);
         this.speedContainer.add_child(this.speed2);
 
         Config.bind('network-header-io', this.speedContainer, 'visible', Gio.SettingsBindFlags.GET);
@@ -291,17 +301,17 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         //     this.speed.queue_relayout();
         //     this.speedContainer.queue_relayout();
         // }
-        const speedWidth = this.speed.get_preferred_width(-1);
-        const width = speedWidth ? speedWidth[1] : 0;
-        this.maxWidths.push(width);
-        if (this.maxWidths.length > Utils.networkMonitor.updateFrequency * 30)
-            this.maxWidths.shift();
-        let max = Math.max(...this.maxWidths);
-        if (max === this.speedContainer.width)
-            return;
-        if (max <= 0)
-            max = 1;
-        this.speedContainer.set_width(max);
+        // const speedWidth = this.speed.get_preferred_width(-1);
+        // const width = speedWidth ? speedWidth[1] : 0;
+        // this.maxWidths.push(width);
+        // if (this.maxWidths.length > Utils.networkMonitor.updateFrequency * 30)
+        //     this.maxWidths.shift();
+        // let max = Math.max(...this.maxWidths);
+        // if (max === this.speedContainer.width)
+        //     return;
+        // if (max <= 0)
+        //     max = 1;
+        // this.speedContainer.set_width(max);
     }
     update() {
         this.maxWidths = [];
