@@ -180,7 +180,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         this.speed = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'border: none; padding:0; margin:0; text-align:right;',
+            style: 'font-size: 12px; border: none; padding:0; margin:0; text-align:right;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.END,
             xExpand: true,
@@ -191,7 +191,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         this.sep = new St.Label({
             text: '|',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'text-align: center; border: none; padding:0; margin: 0 5px 0 5px;',
+            style: 'text-align: center; border: none; padding:0;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.START,
             xExpand: true,
@@ -219,6 +219,25 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         Config.bind('network-header-io', this.speedContainer, 'visible', Gio.SettingsBindFlags.GET);
         Utils.networkMonitor.listen(this.speedContainer, 'networkIO', this.updateSpeed.bind(this));
     }
+
+    getStyle(speed) {
+      if(speed < 500)
+        return 'font-size: 13px; text-align: right; color:gold; border: none; padding:0;';
+      else if(speed < 750)
+        return 'font-size: 14px; text-align: right; color:orange; border: none; padding:0;';
+      else
+        return 'text-align: right; color:lime; border: none; padding:0;';
+    }
+
+    getStyle2(speed) {
+      if(speed < 500)
+        return 'font-size: 12px; color:gold; border: none; padding:0; margin:0; text-align:left;';
+      else if(speed < 750)
+        return 'font-size: 12px; color:orange; border: none; padding:0; margin:0; text-align:left;';
+      else
+        return 'font-size: 12px; color:lime; border: none; padding:0; margin:0; text-align:left;';
+    }
+
     updateSpeed() {
         if (!this.visible)
             return;
@@ -249,14 +268,24 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         else {
             // this.speed.text = `${download}\n${upload}`;
           if(downloadSpeed > 1)
+          {
             this.speed.text = `${this.formatSpeed(usage.bytesDownloadedPerSec)}`;
+            this.speed.style = this.getStyle(downloadSpeed);
+          }
           else
+          {
+            this.speed.style = 'font-size: 12px; text-align: right; color:white; border: none; padding:0;';
             this.speed.text = '0 KB/s';
+          }
 
-          if(uploadSpeed > 1)
+          if(uploadSpeed > 1){
             this.speed2.text = `${this.formatSpeed(usage.bytesUploadedPerSec)}`;
-          else
+            this.speed2.style = this.getStyle2(uploadSpeed);
+          }
+          else{
             this.speed2.text = '0 KB/s';
+            this.speed2.style = 'font-size: 12px; color: white; border: none; padding:0; margin:0; text-align:left;';
+          }
         }
         this.fixSpeedContainerStyle();
     }
