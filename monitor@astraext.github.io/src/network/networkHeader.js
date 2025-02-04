@@ -180,7 +180,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         this.speed = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-weight:bold; border: none; padding:0; margin:0; text-align:right;',
+            style: 'border: none; padding:0; margin:0; text-align:right;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.END,
             xExpand: true,
@@ -191,7 +191,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         this.sep = new St.Label({
             text: '|',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-weight:bold; text-align: center; border: none; padding:0; margin: 0 5px 0 5px;',
+            style: 'text-align: center; border: none; padding:0; margin: 0 5px 0 5px;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.START,
             xExpand: true,
@@ -202,7 +202,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         this.speed2 = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-size: 12px; font-weight: bold; border: none; padding:0; margin:0; text-align:left;',
+            style: 'font-size: 12px; border: none; padding:0; margin:0; text-align:left;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.START,
             xExpand: true,
