@@ -173,24 +173,71 @@ export default GObject.registerClass(class NetworkHeader extends Header {
     buildSpeed() {
         this.speedContainer = new St.BoxLayout({
             xAlign: Clutter.ActorAlign.START,
-            yAlign: Clutter.ActorAlign.FILL,
+            yAlign: Clutter.ActorAlign.CENTER,
             yExpand: true,
-            vertical: true,
-            width: 1,
+            xExpand: true,
         });
         this.speed = new St.Label({
             text: '',
             styleClass: 'astra-monitor-header-speed-label',
-            style: 'font-size: 0.65em;',
+            style: 'font-size: 12px; border: none; padding:0; margin:0; text-align:right;',
             yAlign: Clutter.ActorAlign.CENTER,
             xAlign: Clutter.ActorAlign.END,
             xExpand: true,
             yExpand: true,
+            width:80
         });
+
+        this.sep = new St.Label({
+            text: '|',
+            styleClass: 'astra-monitor-header-speed-label',
+            style: 'text-align: center; border: none; padding:0;',
+            yAlign: Clutter.ActorAlign.CENTER,
+            xAlign: Clutter.ActorAlign.START,
+            xExpand: true,
+            yExpand: true,
+            width:20
+        });
+
+        this.speed2 = new St.Label({
+            text: '',
+            styleClass: 'astra-monitor-header-speed-label',
+            style: 'font-size: 12px; border: none; padding:0; margin:0; text-align:left;',
+            yAlign: Clutter.ActorAlign.CENTER,
+            xAlign: Clutter.ActorAlign.START,
+            xExpand: true,
+            yExpand: true,
+            width:60
+        });
+
+        this.speedContainer.set_vertical(false);
+      
         this.speedContainer.add_child(this.speed);
+        this.speedContainer.add_child(this.sep);
+        this.speedContainer.add_child(this.speed2);
+
         Config.bind('network-header-io', this.speedContainer, 'visible', Gio.SettingsBindFlags.GET);
         Utils.networkMonitor.listen(this.speedContainer, 'networkIO', this.updateSpeed.bind(this));
     }
+
+    getStyle(speed) {
+      if(speed < 500)
+        return 'font-size: 13px; text-align: right; color:gold; border: none; padding:0;';
+      else if(speed < 750)
+        return 'font-size: 14px; text-align: right; color:orange; border: none; padding:0;';
+      else
+        return 'text-align: right; color:lime; border: none; padding:0;';
+    }
+
+    getStyle2(speed) {
+      if(speed < 500)
+        return 'font-size: 12px; color:gold; border: none; padding:0; margin:0; text-align:left;';
+      else if(speed < 750)
+        return 'font-size: 12px; color:orange; border: none; padding:0; margin:0; text-align:left;';
+      else
+        return 'font-size: 12px; color:lime; border: none; padding:0; margin:0; text-align:left;';
+    }
+
     updateSpeed() {
         if (!this.visible)
             return;
@@ -199,6 +246,7 @@ export default GObject.registerClass(class NetworkHeader extends Header {
         let upload = Utils.zeroStr + ' B/s';
         let download = Utils.zeroStr + ' B/s';
         const usage = Utils.networkMonitor.getCurrentValue('networkIO');
+        // console.log(Math.trunc(usage.bytesDownloadedPerSec/1000));
         if (usage) {
             let bytesUploadedPerSec = usage.bytesUploadedPerSec;
             let bytesDownloadedPerSec = usage.bytesDownloadedPerSec;
@@ -213,50 +261,86 @@ export default GObject.registerClass(class NetworkHeader extends Header {
             upload = Utils.formatBytesPerSec(bytesUploadedPerSec, unit, maxFigures, true);
             download = Utils.formatBytesPerSec(bytesDownloadedPerSec, unit, maxFigures, true);
         }
+        let downloadSpeed = Math.trunc(usage.bytesDownloadedPerSec/1000);
+        let uploadSpeed = Math.trunc(usage.bytesUploadedPerSec/1000);
         if (this.ioLayout === 'horizontal')
-            this.speed.text = `${upload} | ${download}`;
-        else
-            this.speed.text = `${upload}\n${download}`;
+            this.speed.text = `${download} | ${upload}`;
+        else {
+            // this.speed.text = `${download}\n${upload}`;
+          if(downloadSpeed > 1)
+          {
+            this.speed.text = `${this.formatSpeed(usage.bytesDownloadedPerSec)}`;
+            this.speed.style = this.getStyle(downloadSpeed);
+          }
+          else
+          {
+            this.speed.style = 'font-size: 12px; text-align: right; color:white; border: none; padding:0;';
+            this.speed.text = '0 KB/s';
+          }
+
+          if(uploadSpeed > 1){
+            this.speed2.text = `${this.formatSpeed(usage.bytesUploadedPerSec)}`;
+            this.speed2.style = this.getStyle2(uploadSpeed);
+          }
+          else{
+            this.speed2.text = '0 KB/s';
+            this.speed2.style = 'font-size: 12px; color: white; border: none; padding:0; margin:0; text-align:left;';
+          }
+        }
         this.fixSpeedContainerStyle();
     }
+
+    formatSpeed(bytesPerSec) {
+        if (bytesPerSec <= 0) return "0 B/s";
+
+        const units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"];
+        let index = Math.min(Math.floor(Math.log2(bytesPerSec) / 10), units.length - 1);
+        let speed = bytesPerSec / (1 << (index * 10));
+
+        let formattedSpeed = (index === 1) ? Math.round(speed) : (index === 2 ? speed.toFixed(1) : speed.toFixed(2));
+
+        return `${formattedSpeed} ${units[index]}`;
+    }
+
     fixSpeedContainerStyle() {
         if (!this.speedContainer.get_parent())
             return;
         if (!this.speed.get_parent())
             return;
-        const calculateStyle = () => {
-            let defaultStyle = 'font-size:0.65em;';
-            const fontSize = Config.get_int('headers-font-size');
-            if (fontSize)
-                defaultStyle = `font-size:${fontSize}px;`;
-            if (this.ioLayout === 'horizontal')
-                return fontSize ? defaultStyle : 'font-size:1em';
-            const superHeight = this.speedContainer.get_parent()?.get_allocation_box()?.get_height() ?? 0;
-            let scaledHeight = superHeight / this.scaleFactor;
-            if (scaledHeight <= 20)
-                return defaultStyle;
-            scaledHeight = Math.round(scaledHeight / 3);
-            if (fontSize && fontSize < scaledHeight)
-                return defaultStyle;
-            return `font-size:${scaledHeight}px;`;
-        };
-        const style = calculateStyle();
-        if (this.speed.style !== style) {
-            this.speed.style = style;
-            this.speed.queue_relayout();
-            this.speedContainer.queue_relayout();
-        }
-        const speedWidth = this.speed.get_preferred_width(-1);
-        const width = speedWidth ? speedWidth[1] : 0;
-        this.maxWidths.push(width);
-        if (this.maxWidths.length > Utils.networkMonitor.updateFrequency * 30)
-            this.maxWidths.shift();
-        let max = Math.max(...this.maxWidths);
-        if (max === this.speedContainer.width)
-            return;
-        if (max <= 0)
-            max = 1;
-        this.speedContainer.set_width(max);
+        // const calculateStyle = () => {
+        //     let defaultStyle = 'font-size:14px;';
+        //     // const fontSize = Config.get_int('headers-font-size');
+        //     const fontSize = 15;
+        //     if (fontSize)
+        //         defaultStyle = `font-size:${fontSize}px;`;
+        //     if (this.ioLayout === 'horizontal')
+        //         return fontSize ? defaultStyle : 'font-size:14px';
+        //     const superHeight = this.speedContainer.get_parent()?.get_allocation_box()?.get_height() ?? 0;
+        //     let scaledHeight = superHeight / this.scaleFactor;
+        //     if (scaledHeight <= 20)
+        //         return defaultStyle;
+        //     scaledHeight = Math.round(scaledHeight / 3);
+        //     if (fontSize && fontSize < scaledHeight)
+        //         return defaultStyle;
+        //     return `font-size:14px;`;
+        // };
+        // const style = calculateStyle();
+        // if (this.speed.style !== style) {
+        //     this.speed.style = style;
+        //     this.speed.queue_relayout();
+        //     this.speedContainer.queue_relayout();
+        // }
+        // const speedWidth = this.speed.get_preferred_width(-1);
+        // const width = speedWidth ? speedWidth[1] : 0;
+        // this.maxWidths.push(width);
+        // if (this.maxWidths.length > Utils.networkMonitor.updateFrequency * 30)
+        //     this.maxWidths.shift();
+        // let max = Math.max(...this.maxWidths);
+        // if (max === this.speedContainer.width)
+        //     return;
+        // if (max <= 0)
+        //     max = 1;
+        // this.speedContainer.set_width(max);
     }
     update() {
         this.maxWidths = [];
