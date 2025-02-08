@@ -67,15 +67,15 @@ export default GObject.registerClass(class SensorBars extends BarsBase {
             else {
                 const usagePercent = usage[i].total;
 
-                if(usagePercent <= 50){ 
+                if(usagePercent <= 55){ 
                   values.push([{ color: 3, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 55) {
-                  values.push([{ color: 5, value: usage[i].total / 100.0 }]);
                 } else if(usagePercent <= 60) {
-                  values.push([{ color: 6, value: usage[i].total / 100.0 }]);
+                  values.push([{ color: 5, value: usage[i].total / 100.0 }]);
                 } else if(usagePercent <= 65) {
-                  values.push([{ color: 7, value: usage[i].total / 100.0 }]);
+                  values.push([{ color: 6, value: usage[i].total / 100.0 }]);
                 } else if(usagePercent <= 70) {
+                  values.push([{ color: 7, value: usage[i].total / 100.0 }]);
+                } else if(usagePercent <= 80) {
                   values.push([{ color: 8, value: usage[i].total / 100.0 }]);
                 } else if(usagePercent <= 100) {
                   values.push([{ color: 8, value: usage[i].total / 100.0 }]);

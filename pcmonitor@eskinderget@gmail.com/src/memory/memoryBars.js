@@ -20,6 +20,7 @@
 import GObject from 'gi://GObject';
 import BarsBase from '../bars.js';
 import Config from '../config.js';
+import Sound from '../utils/sound.js';
 export default GObject.registerClass(class MemoryBars extends BarsBase {
     constructor(params) {
 
@@ -80,14 +81,15 @@ export default GObject.registerClass(class MemoryBars extends BarsBase {
                 } else if(usagePercent <= 60) {
                   values.push([{ color: 3, value: usage[i].used / usage[i].total }]);
                 } else if(usagePercent <= 80) {
-                  values.push([{ color: 4, value: usage[i].used / usage[i].total }]);
+                  values.push([{ color: 3, value: usage[i].used / usage[i].total }]);
                 } else if(usagePercent <= 85) {
-                  values.push([{ color: 5, value: usage[i].used / usage[i].total }]);
+                  values.push([{ color: 3, value: usage[i].used / usage[i].total }]);
                 } else if(usagePercent <= 90) {
                   values.push([{ color: 6, value: usage[i].used / usage[i].total }]);
                 } else if(usagePercent <= 95) {
                   values.push([{ color: 7, value: usage[i].used / usage[i].total }]);
                 } else if(usagePercent <= 100) {
+                  Sound.playError();
                   values.push([{ color: 8, value: usage[i].used / usage[i].total }]);
                 }
 

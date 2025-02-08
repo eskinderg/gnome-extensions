@@ -93,6 +93,7 @@ export default GObject.registerClass(class Header extends St.Widget {
                 });
             }
         });
+        this.set_style('border-radius: 0px; padding:0; margin:0;');
     }
     getMenu() {
         return this.menu;

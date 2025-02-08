@@ -66,9 +66,9 @@ export default GObject.registerClass(class ProcessorBars extends BarsBase {
             else {
                 const usagePercent = usage[i].total;
 
-                if(usagePercent <= 50){ 
+                if(usagePercent <= 30){ 
                   values.push([{ color: 3, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 60) {
+                } else if(usagePercent <= 50) {
                   values.push([{ color: 4, value: usage[i].total / 100.0 }]);
                 } else if(usagePercent <= 65) {
                   values.push([{ color: 5, value: usage[i].total / 100.0 }]);

@@ -27,7 +27,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import Header from '../header.js';
 import Config from '../config.js';
 import Utils from '../utils/utils.js';
-import Grid from '../grid.js';
+import Sound from '../utils/sound.js';
 import SensorsMenu from './sensorsMenu.js';
 import SensorBars from './sensorBars.js';
 import MenuBase from '../menu.js';
@@ -340,6 +340,7 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             // return `font-size:${scaledHeight}px;`;
             // return (parseInt(sensor1) > 43 ) ? `font-size:11px; color: red;` : `font-size:11px;` ;
             if(parseInt(sensor1) > 65 ) {
+                  Sound.playError();
                   const iconStyle = 'margin-left:2px;';
                   this.icon.style = iconStyle + 'color: red;';
               return `font-size:11px; color: red;`;
@@ -392,7 +393,8 @@ export default GObject.registerClass(class SensorsHeader extends Header {
           sensor2 = '';
       }
 
-      if(parseInt(sensor2) > 50 ) {
+      if(parseInt(sensor2) > 55 ) {
+            Sound.playError();
             const iconStyle = 'margin-left:2px;';
             this.icon.style = iconStyle + 'color: red;';
         return `font-size:11px; color: red;`;
