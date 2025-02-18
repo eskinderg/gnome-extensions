@@ -23,21 +23,8 @@ import Clutter from 'gi://Clutter';
 import Utils from './utils/utils.js';
 import Config from './config.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import GLib from 'gi://GLib';
-
 export default GObject.registerClass(class BarsBase extends St.BoxLayout {
-
-
     constructor(params) {
-
-    // const { Log } = imports.gi.GLib; 
-    // Log.Debug("MyExtension", "This is a debug message"); 
-    // Utils.log(params + "================ layout " + params.layout);
-        // params.mini = true;
-        // params.layers = 1;
-        // params.numBars = 4;
-        // params.hideEmpty = true;
-
         if (params.layout === undefined)
             params.layout = 'vertical';
         if (params.numBars === undefined)
@@ -47,7 +34,7 @@ export default GObject.registerClass(class BarsBase extends St.BoxLayout {
         if (params.height === undefined)
             params.height = 0;
         if (params.layers === undefined)
-            params.layers = 2;
+            params.layers = 1;
         if (params.header === undefined)
             params.header = false;
         if (params.mini === undefined)
@@ -89,7 +76,6 @@ export default GObject.registerClass(class BarsBase extends St.BoxLayout {
         Config.connect(this, 'changed::theme-style', this.setStyle.bind(this));
         const size = this.layout === 'vertical' ? params.width : params.height;
         this.barSize = this.computeBarSize(params.numBars, size);
-    //console.log("==================sdfsdfsf");
         const bars = new Array(params.numBars);
         for (let i = 0; i < params.numBars; i++) {
             bars[i] = [];
@@ -162,8 +148,6 @@ export default GObject.registerClass(class BarsBase extends St.BoxLayout {
         Utils.log('setUsage MUST BE OVERWRITTEN');
     }
     updateBars(values) {
-          
-        // Utils.log('&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& ');
         if (!this.get_stage() || !this.get_parent())
             return;
         if (this.header) {

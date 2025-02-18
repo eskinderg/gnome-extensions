@@ -22,33 +22,17 @@ import BarsBase from '../bars.js';
 import Config from '../config.js';
 export default GObject.registerClass(class MemoryBars extends BarsBase {
     constructor(params) {
-
-        // if(params.header == true) {
-        //     params.layout = 'horizontal';
-        //     params.width = 80;
-        //     // params.header = true;
-        //     params.height = 1;
-        // }
-
         if (params.layers === undefined)
             params.layers = 2;
         super(params);
         Config.connect(this, 'changed::memory-header-bars-color1', this.setStyle.bind(this));
         Config.connect(this, 'changed::memory-header-bars-color2', this.setStyle.bind(this));
-        Config.connect(this, 'changed::memory-header-bars-color3', this.setStyle.bind(this));
     }
     setStyle() {
         super.setStyle();
         this.colors = [
             Config.get_string('memory-header-bars-color1') ?? 'rgba(29,172,214,1.0)',
             Config.get_string('memory-header-bars-color2') ?? 'rgba(29,172,214,0.3)',
-            'rgba(29,172,214,1.0)',
-            'rgba(34,163,105,1.0)',
-            'rgba(172,179,52,1.0)',
-            'rgba(250,183,51,1.0)',
-            'rgba(255,142,21,1.0)',
-            'rgba(255,78,17,1.0)',
-            'rgba(255,13,13,1.0)',
         ];
     }
     setUsage(usage) {
@@ -68,30 +52,7 @@ export default GObject.registerClass(class MemoryBars extends BarsBase {
                 ]);
             }
             else {
-                const usagePercent = (usage[i].used / usage[i].total) * 100;
-
-                // if(percentUsed < 90){ 
-                //   values.push([{ color: 0, value: usage[i].used / usage[i].total }]);
-                // } else {
-                //   values.push([{ color: 2, value: usage[i].used / usage[i].total }]);
-                // }
-                if(usagePercent <= 50){ 
-                  values.push([{ color: 3, value: usage[i].used / usage[i].total }]);
-                } else if(usagePercent <= 60) {
-                  values.push([{ color: 3, value: usage[i].used / usage[i].total }]);
-                } else if(usagePercent <= 80) {
-                  values.push([{ color: 4, value: usage[i].used / usage[i].total }]);
-                } else if(usagePercent <= 85) {
-                  values.push([{ color: 5, value: usage[i].used / usage[i].total }]);
-                } else if(usagePercent <= 90) {
-                  values.push([{ color: 6, value: usage[i].used / usage[i].total }]);
-                } else if(usagePercent <= 95) {
-                  values.push([{ color: 7, value: usage[i].used / usage[i].total }]);
-                } else if(usagePercent <= 100) {
-                  values.push([{ color: 8, value: usage[i].used / usage[i].total }]);
-                }
-
-                // values.push([{ color: 0, value: usage[i].used / usage[i].total }]);
+                values.push([{ color: 0, value: usage[i].used / usage[i].total }]);
             }
         }
         this.updateBars(values);

@@ -1,3 +1,31 @@
+# Astra Monitor 31 - February 17 2025
+
+### Bug fixes
+
+-   Reverted command spawner due to its potential to cause crashes; this change reintroduces lag in the menus because of a GLib limitation. A new solution is being explored, as preventing crashes remains the top priority.
+-   Fixed display counter: now excluding writeback connectors.
+
+# Astra Monitor 30 - February 13 2025
+
+### New features
+
+-   **_Preliminary Multi-GPU Monitoring Support_**: Introduced initial support for monitoring multiple GPUs simultaneously. This feature allows viewing and managing the performance metrics of multiple GPUs within the Astra Monitor interface. While still in its early stages, this functionality aims to provide comprehensive insights into multi-GPU setups, enhancing the monitoring capabilities for those with complex hardware configurations. Feedback is welcome to help refine and improve this feature.
+
+    _Note: This development paves the way for integrated GPU support and will eventually allow the system to automatically check and select the active GPU. Currently, it is necessary to manually set the main GPU, but this process will possibly be automated in future updates._
+
+-   **_Display Output and Display Info_**: Added support for display output and detailed display information. This enhancement allows detailed display parameters to be viewed directly from the Astra Monitor interface, streamlining the management and troubleshooting of connected monitors. While only a subset of the parsed EDID data is utilized at present, this lays the groundwork for incorporating even more in-depth display information in future updates. Your feedback is welcome as we continue to refine this functionality.
+
+![screenshot](https://github.com/user-attachments/assets/fbf2da8e-b967-401a-8c3c-d09e95031806)
+
+### Bug fixes
+
+-   Fixed lag issue while navigating through the menu [[#138](https://github.com/AstraExt/astra-monitor/issues/138)] (related to [GNOME GLib issue #3229](https://gitlab.gnome.org/GNOME/glib/-/issues/3229))
+-   `nvidia-smi` parsing performance improved by ~40%
+-   Fixed CPU frequency not being correctly displayed [[#155](https://github.com/AstraExt/astra-monitor/issues/155)] [[#168](https://github.com/AstraExt/astra-monitor/issues/168)]
+-   Fixed GPU detection on some GPUs [[#162](https://github.com/AstraExt/astra-monitor/issues/162)]
+-   Fixed GPU model name not being correctly displayed [[#152](https://github.com/AstraExt/astra-monitor/issues/152)]
+-   Improved NVIDIA `nvidia-smi` parsing for better sensors monitoring
+
 # Astra Monitor 29 - October 2 2024
 
 ### New features

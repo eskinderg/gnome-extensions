@@ -185,11 +185,9 @@ export default GObject.registerClass(class MemoryHeader extends Header {
         }
         this.bars = new MemoryBars({
             numBars: 1,
-            layout: 'horizontal',
             header: true,
             mini: true,
-            width: 70,
-            height: 0.8,
+            width: 0.5,
             breakdownConfig: 'memory-header-bars-breakdown',
         });
         Config.bind('memory-header-bars', this.bars, 'visible', Gio.SettingsBindFlags.GET);

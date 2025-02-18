@@ -20,6 +20,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Config from '../config.js';
+import CommandHelper from './commandHelper.js';
 import XMLParser from './xmlParser.js';
 class Utils {
     static init({ service, extension, metadata, settings, ProcessorMonitor, GpuMonitor, MemoryMonitor, StorageMonitor, NetworkMonitor, SensorsMonitor, }) {
@@ -372,6 +373,13 @@ class Utils {
     }
     static isIntelGpu(gpu) {
         return gpu.vendorId === '8086';
+    }
+    static canMonitorGpu(gpu) {
+        if (Utils.isAmdGpu(gpu))
+            return Utils.hasAmdGpuTop();
+        if (Utils.isNvidiaGpu(gpu))
+            return Utils.hasNvidiaSmi();
+        return false;
     }
     static async hasGTop() {
         while (Utils.GTop === undefined) {
@@ -897,7 +905,7 @@ class Utils {
                 return Utils.lspciCached;
             }
             const lspciOutput = decoder.decode(stdout);
-            const filteredOutputs = Utils.filterLspciOutput(lspciOutput, ['vga', 'display controller'], 'or', 5);
+            const filteredOutputs = Utils.filterLspciOutput(lspciOutput, ['vga', 'display controller', '3d controller'], 'or', 5);
             for (const filtered of filteredOutputs) {
                 const lines = filtered.split('\n');
                 for (let i = lines.length - 1; i >= 1; i--) {
@@ -993,18 +1001,27 @@ class Utils {
     }
     static getGPUModelName(gpu) {
         let shortName = Utils.GPUModelShortify(gpu.model);
+        const shortVendorName = Utils.GPUModelShortify(gpu.vendor);
         const vendorNames = Utils.getVendorName('0x' + gpu.vendorId);
         if (vendorNames[0] === 'Unknown')
             return shortName;
-        const normalizedShortName = shortName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-        if (!vendorNames.some(vendorName => normalizedShortName.includes(vendorName.toLowerCase()))) {
-            const shortVendorName = Utils.GPUModelShortify(gpu.vendor);
-            const normalizedVendorName = shortVendorName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-            if (shortVendorName &&
-                vendorNames.some(vendorName => normalizedVendorName.includes(vendorName.toLowerCase())))
-                shortName = shortVendorName + ` [${shortName}]`;
-            else
-                shortName = vendorNames.join(' / ') + ` ${shortName}`;
+        if (shortVendorName.startsWith(shortName) && shortVendorName.length > shortName.length) {
+            shortName = shortVendorName;
+        }
+        else if (shortName.length < 32) {
+            const normalizedShortName = shortName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+            if (!vendorNames.some(vendorName => normalizedShortName.includes(vendorName.toLowerCase()))) {
+                const normalizedVendorName = shortVendorName
+                    .replace(/[^a-zA-Z0-9]/g, '')
+                    .toLowerCase();
+                if (shortVendorName &&
+                    vendorNames.some(vendorName => normalizedVendorName.includes(vendorName.toLowerCase()))) {
+                    shortName = shortVendorName + ` [${shortName}]`;
+                }
+                else {
+                    shortName = vendorNames.join(' / ') + ` ${shortName}`;
+                }
+            }
         }
         return shortName;
     }
@@ -1042,24 +1059,37 @@ class Utils {
         model = model.trim();
         return model;
     }
-    static getSelectedGPU() {
-        const selected = Config.get_json('gpu-main');
-        if (!selected)
+    static isSameGpu(gpu1, gpu2) {
+        if (!gpu1 || !gpu2)
+            return false;
+        return (gpu1.domain === gpu2.domain &&
+            gpu1.bus === gpu2.bus &&
+            gpu1.slot === gpu2.slot &&
+            gpu1.vendorId === gpu2.vendorId &&
+            gpu1.productId === gpu2.productId);
+    }
+    static getMonitoredGPUs() {
+        const gpusData = Config.get_json('gpu-data');
+        if (!gpusData)
+            return [];
+        const gpus = Utils.getGPUsList();
+        return gpusData.filter((gpuData) => gpus.some((gpu) => Utils.isSameGpu(gpu, gpuData)));
+    }
+    static getMainGPU() {
+        const mainGpu = Config.get_json('gpu-main');
+        if (!mainGpu)
             return undefined;
-        if (selected && selected.domain) {
-            if (!selected.domain.includes(':'))
-                selected.domain = '0000:' + selected.domain;
-        }
         const gpus = Utils.getGPUsList();
         for (const gpu of gpus) {
-            if (gpu.domain === selected.domain &&
-                gpu.bus === selected.bus &&
-                gpu.slot === selected.slot &&
-                gpu.vendorId === selected.vendorId &&
-                gpu.productId === selected.productId)
+            if (Utils.isSameGpu(gpu, mainGpu))
                 return gpu;
         }
         return undefined;
+    }
+    static getPCI(gpu) {
+        if (!gpu)
+            return '';
+        return `${gpu.domain}:${gpu.bus}.${gpu.slot}`;
     }
     static getUptime(callback) {
         const syncTime = () => {
@@ -1171,7 +1201,7 @@ class Utils {
             return disks;
         try {
             const path = Utils.commandPathLookup('lsblk -V');
-            const result = await Utils.executeCommandAsync(`${path}lsblk -J -o ID,NAME,LABEL,MOUNTPOINTS,PATH`, task);
+            const result = await CommandHelper.runCommand(`${path}lsblk -J -o ID,NAME,LABEL,MOUNTPOINTS,PATH`, task);
             if (result) {
                 const parsedData = JSON.parse(result);
                 const findDevice = (device) => {
@@ -1210,7 +1240,7 @@ class Utils {
             }
         }
         if (disks.size > 0)
-            return disks.keys().next().value;
+            return disks.keys().next().value || null;
         return null;
     }
     static movingAverage(values, size) {
@@ -1342,7 +1372,7 @@ class Utils {
             return false;
         }
     }
-    static readFileAsync(path, emptyOnFail = false) {
+    static readFileAsync(path, emptyOnFail = false, encoding = 'utf8') {
         return new Promise((resolve, reject) => {
             if (!path || typeof path !== 'string') {
                 if (emptyOnFail)
@@ -1383,8 +1413,22 @@ class Utils {
                             reject(new Error('File is empty'));
                         return;
                     }
-                    const decoder = new TextDecoder('utf8');
-                    resolve(decoder.decode(fileContent));
+                    if (encoding === 'utf8') {
+                        const decoder = new TextDecoder('utf8');
+                        resolve(decoder.decode(fileContent));
+                    }
+                    else if (encoding === 'str') {
+                        resolve(fileContent.toString());
+                    }
+                    else if (encoding === 'hex') {
+                        const hexString = Array.from(fileContent)
+                            .map(byte => byte.toString(16).padStart(2, '0'))
+                            .join('');
+                        resolve(hexString);
+                    }
+                    else {
+                        reject(new Error('Invalid encoding'));
+                    }
                 }
                 catch (e) {
                     if (emptyOnFail)
@@ -1485,58 +1529,6 @@ class Utils {
             });
         });
     }
-    static executeCommandAsync(command, cancellableTaskManager) {
-        return new Promise((resolve, reject) => {
-            let argv;
-            try {
-                argv = GLib.shell_parse_argv(command);
-                if (!argv[0]) {
-                    throw new Error('Invalid command');
-                }
-            }
-            catch (e) {
-                reject(new Error(`Failed to parse command: ${e.message}`));
-                return;
-            }
-            const proc = new Gio.Subprocess({
-                argv: argv[1] || [],
-                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
-            });
-            try {
-                const init = proc.init(cancellableTaskManager?.cancellable || null);
-                if (!init) {
-                    reject(new Error('Failed to initialize subprocess'));
-                    return;
-                }
-            }
-            catch (e) {
-                reject(new Error(`Failed to initialize subprocess: ${e.message}`));
-                return;
-            }
-            cancellableTaskManager?.setSubprocess(proc);
-            proc.communicate_utf8_async(null, null, (sub, res) => {
-                if (!sub) {
-                    reject(new Error('Subprocess invalid'));
-                    return;
-                }
-                try {
-                    const [, stdout, stderr] = sub.communicate_utf8_finish(res);
-                    if (sub.get_exit_status() !== 0) {
-                        if (!stderr)
-                            throw new Error('No error output');
-                        reject(new Error(`Command failed with error: ${stderr.trim()}`));
-                        return;
-                    }
-                    if (!stdout)
-                        throw new Error('No output');
-                    resolve(stdout.trim());
-                }
-                catch (e) {
-                    reject(new Error(`Failed to communicate with subprocess: ${e.message}`));
-                }
-            });
-        });
-    }
     static getLocalIcon(iconName) {
         if (!Utils.metadata || !Utils.metadata.path)
             return undefined;
@@ -1624,7 +1616,7 @@ class Utils {
             return devices;
         try {
             const path = Utils.commandPathLookup('ip -V');
-            const result = await Utils.executeCommandAsync(`${path}ip -d -j addr`, task);
+            const result = await CommandHelper.runCommand(`${path}ip -d -j addr`, task);
             if (result) {
                 const json = JSON.parse(result);
                 for (const data of json) {
@@ -1704,7 +1696,7 @@ class Utils {
             return routes;
         try {
             const path = Utils.commandPathLookup('ip -V');
-            const result = await Utils.executeCommandAsync(`${path}ip -d -j route show default`, task);
+            const result = await CommandHelper.runCommand(`${path}ip -d -j route show default`, task);
             if (result) {
                 const json = JSON.parse(result);
                 for (const data of json) {
@@ -1758,7 +1750,7 @@ class Utils {
             return devices;
         try {
             const commandPath = Utils.commandPathLookup('lsblk -V');
-            const result = await Utils.executeCommandAsync(`${commandPath}lsblk -Jb -o ID,UUID,NAME,KNAME,PKNAME,LABEL,TYPE,SUBSYSTEMS,MOUNTPOINTS,VENDOR,MODEL,PATH,RM,RO,STATE,OWNER,SIZE,FSUSE%,FSTYPE`, task);
+            const result = await CommandHelper.runCommand(`${commandPath}lsblk -Jb -o ID,UUID,NAME,KNAME,PKNAME,LABEL,TYPE,SUBSYSTEMS,MOUNTPOINTS,VENDOR,MODEL,PATH,RM,RO,STATE,OWNER,SIZE,FSUSE%,FSTYPE`, task);
             if (result) {
                 const json = JSON.parse(result);
                 for (const device of json.blockdevices) {
@@ -1903,24 +1895,39 @@ class Utils {
             length += value.length;
         return (length *= 20);
     }
-    static xmlParse(xml) {
+    static xmlParse(xml, skips = []) {
         if (!Utils.xmlParser)
             return undefined;
-        return Utils.xmlParser.parse(xml);
+        return Utils.xmlParser.parse(xml, skips);
     }
     static performanceStart(name) {
         if (!Utils.debug)
             return;
-        Utils.performanceMap?.set(name, GLib.get_monotonic_time());
+        let performance = Utils.performanceMap?.get(name);
+        if (!performance) {
+            performance = { start: GLib.get_monotonic_time(), mean: 0, count: 0 };
+        }
+        else {
+            performance.start = GLib.get_monotonic_time();
+        }
+        Utils.performanceMap?.set(name, performance);
     }
     static performanceEnd(name) {
         if (!Utils.debug)
             return;
-        const start = Utils.performanceMap?.get(name);
-        if (start) {
+        const performance = Utils.performanceMap?.get(name);
+        if (performance) {
             const end = GLib.get_monotonic_time();
-            Utils.log(`${name} took ${((end - start) / 1000).toFixed(2)}ms`);
-            Utils.performanceMap?.set(name, 0);
+            const time = (end - performance.start) / 1000;
+            performance.mean =
+                (performance.mean * performance.count + time) / (performance.count + 1);
+            performance.count++;
+            Utils.log(`${name} took ${performance.mean.toFixed(2)}ms (mean: ${performance.mean.toFixed(2)}ms)`);
+            Utils.performanceMap?.set(name, {
+                start: GLib.get_monotonic_time(),
+                mean: performance.mean,
+                count: performance.count,
+            });
         }
     }
     static convertCharListToString(value) {
@@ -1986,7 +1993,7 @@ class Utils {
             Config.set('memory-header-bars-color2', 'rgba(29,172,214,0.3)', 'string');
         }
         const processorMenuGpu = Config.get_json('processor-menu-gpu');
-        const gpuMain = Config.get_json('gpu-main');
+        let gpuMain = Config.get_json('gpu-main');
         if (processorMenuGpu && !gpuMain) {
             Config.set('gpu-main', processorMenuGpu, 'json');
             Config.set('processor-menu-gpu', '""', 'string');
@@ -2012,6 +2019,18 @@ class Utils {
             const currentProfile = Config.get_string('current-profile') || 'default';
             profiles[currentProfile] = Config.getCurrentSettingsData(Config.globalSettingsKeys);
             Config.set('profiles', profiles, 'json');
+        }
+        gpuMain = Config.get_json('gpu-main');
+        if (gpuMain && gpuMain.domain) {
+            let gpuData = Config.get_json('gpu-data');
+            if (!gpuData) {
+                gpuData = [];
+                if (!gpuMain.domain.includes(':'))
+                    gpuMain.domain = '0000:' + gpuMain.domain;
+                gpuMain.monitor = true;
+                gpuData.push(gpuMain);
+                Config.set('gpu-data', gpuData, 'json');
+            }
         }
     }
     static unitToIcon(unit) {
@@ -2114,6 +2133,9 @@ class Utils {
         Utils.nethogsCaps = decoder.decode(stdout).split(/\s+|,/).slice(1);
         return (Utils.nethogsCaps.includes('cap_net_admin') &&
             Utils.nethogsCaps.includes('cap_net_raw=ep'));
+    }
+    static getGpuUUID(gpuInfo) {
+        return `${gpuInfo.domain}:${gpuInfo.bus}.${gpuInfo.slot}`;
     }
 }
 Utils.debug = false;

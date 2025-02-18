@@ -22,14 +22,6 @@ import BarsBase from '../bars.js';
 import Config from '../config.js';
 export default GObject.registerClass(class ProcessorBars extends BarsBase {
     constructor(params) {
-      
-        // if(params.header == true) {
-        //     params.numBars = 3;
-        //     params.layout = 'horizontal';
-        //     params.width = 375;
-        //     params.height = 1.25;
-        // }
-
         if (params.layers === undefined)
             params.layers = 2;
         super(params);
@@ -41,13 +33,6 @@ export default GObject.registerClass(class ProcessorBars extends BarsBase {
         this.colors = [
             Config.get_string('processor-header-bars-color1') ?? 'rgba(29,172,214,1.0)',
             Config.get_string('processor-header-bars-color2') ?? 'rgba(214,29,29,1.0)',
-            'rgba(29,172,214,1.0)',
-            'rgba(34,163,105,1.0)',
-            'rgba(172,179,52,1.0)',
-            'rgba(250,183,51,1.0)',
-            'rgba(255,142,21,1.0)',
-            'rgba(255,78,17,1.0)',
-            'rgba(255,13,13,1.0)',
         ];
     }
     setUsage(usage) {
@@ -64,22 +49,7 @@ export default GObject.registerClass(class ProcessorBars extends BarsBase {
                 ]);
             }
             else {
-                const usagePercent = usage[i].total;
-
-                if(usagePercent <= 50){ 
-                  values.push([{ color: 3, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 60) {
-                  values.push([{ color: 4, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 65) {
-                  values.push([{ color: 5, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 70) {
-                  values.push([{ color: 6, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 90) {
-                  values.push([{ color: 7, value: usage[i].total / 100.0 }]);
-                } else if(usagePercent <= 100) {
-                  values.push([{ color: 8, value: usage[i].total / 100.0 }]);
-                }
-                  // values.push([{ color: 0, value: usage[i].total / 100.0 }]);
+                values.push([{ color: 0, value: usage[i].total / 100.0 }]);
             }
         }
         this.updateBars(values);

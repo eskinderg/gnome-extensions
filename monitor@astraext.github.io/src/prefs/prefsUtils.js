@@ -183,7 +183,9 @@ export default class PrefsUtils {
     }
     static addSwitchRow(props, setting, group) {
         const tabs = props.tabs;
+        const readOnly = props.readOnly;
         delete props.tabs;
+        delete props.readOnly;
         if (props.iconName) {
             if (props.title)
                 props.title = '  ' + props.title;
@@ -197,12 +199,26 @@ export default class PrefsUtils {
             group.add(row);
         else
             group.add_row(row);
+        const isCallback = typeof setting !== 'string';
         const toggle = new Gtk.Switch({
-            active: Config.get_boolean(setting),
+            active: isCallback ? setting.get() : Config.get_boolean(setting),
             halign: Gtk.Align.END,
             valign: Gtk.Align.CENTER,
         });
-        Config.bind(setting, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        if (!isCallback) {
+            Config.bind(setting, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
+        }
+        else {
+            toggle.connect('activate', widget => {
+                setting.set(!widget.active);
+            });
+            Config.connect(this, 'changed::' + setting.watch, () => {
+                toggle.active = setting.get();
+            });
+        }
+        if (readOnly) {
+            toggle.set_sensitive(false);
+        }
         row.add_suffix(toggle);
         row.activatableWidget = toggle;
     }

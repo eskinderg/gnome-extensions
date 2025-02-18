@@ -2447,6 +2447,14 @@ export default class SystemMonitorExtension extends Extension {
             this._Locale = this._Locale.split('_')[0];
         }
 
+        // fallback to en for unsupported locale
+        try {
+            new Date().toLocaleString(this._Locale);
+        } catch (e) {
+            sm_log('fallback to EN: ' + e.message, 'warn')
+            this._Locale = 'en'
+        }
+
         this._IconSize = Math.round(PANEL_ICON_SIZE * 4 / 5);
 
         this._Schema = this.getSettings();
@@ -2461,6 +2469,9 @@ export default class SystemMonitorExtension extends Extension {
         let panel = Main.panel._rightBox;
         if (this._Schema.get_boolean('center-display')) {
             panel = Main.panel._centerBox;
+        }
+        else if (this._Schema.get_boolean('left-display')) {
+            panel = Main.panel._leftBox;
         }
 
         this._MountsMonitor.connect();

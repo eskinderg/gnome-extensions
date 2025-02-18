@@ -25,7 +25,7 @@ export default class XMLParser {
         this.currentTagName = '';
         this.xml = '';
     }
-    parse(xml) {
+    parse(xml, skips = []) {
         this.xml = xml;
         this.resetParser();
         this.skipDeclarations();
@@ -37,8 +37,9 @@ export default class XMLParser {
                 break;
             if (nextLessThan !== this.pos) {
                 const textContent = this.parseTextContent(this.pos);
-                if (textContent && this.currentObj)
+                if (textContent && this.currentObj) {
                     this.currentObj['#text'] = textContent;
+                }
             }
             this.pos = nextLessThan;
             this.skipToNextImportantChar();
@@ -58,6 +59,10 @@ export default class XMLParser {
                 else {
                     if (!this.parseTag())
                         break;
+                    if (skips.includes(this.currentTagName)) {
+                        this.skipAttributesAndBlock(this.currentTagName);
+                        continue;
+                    }
                     const attributes = this.parseAttributes();
                     const newObj = { ...attributes };
                     if (!this.currentObj) {
@@ -65,15 +70,18 @@ export default class XMLParser {
                         this.currentObj = newObj;
                     }
                     else {
-                        if (!this.currentObj[this.currentTagName])
+                        if (!this.currentObj[this.currentTagName]) {
                             this.currentObj[this.currentTagName] = newObj;
-                        else if (Array.isArray(this.currentObj[this.currentTagName]))
+                        }
+                        else if (Array.isArray(this.currentObj[this.currentTagName])) {
                             this.currentObj[this.currentTagName].push(newObj);
-                        else
+                        }
+                        else {
                             this.currentObj[this.currentTagName] = [
                                 this.currentObj[this.currentTagName],
                                 newObj,
                             ];
+                        }
                     }
                     this.stack.push({ tagName: this.currentTagName, obj: newObj });
                     this.currentObj = newObj;
@@ -92,29 +100,47 @@ export default class XMLParser {
         this.currentTagName = '';
     }
     skipDeclarations() {
-        if (this.xml.startsWith('<?xml', this.pos))
-            this.pos = this.xml.indexOf('?>', this.pos) + 2;
+        if (this.xml.startsWith('<?xml', this.pos)) {
+            const endDecl = this.xml.indexOf('?>', this.pos);
+            this.pos = endDecl !== -1 ? endDecl + 2 : this.xml.length;
+        }
         while (this.xml[this.pos] === ' ' ||
             this.xml[this.pos] === '\n' ||
             this.xml[this.pos] === '\t' ||
-            this.xml[this.pos] === '\r')
+            this.xml[this.pos] === '\r') {
             this.pos++;
-        if (this.xml.startsWith('<!DOCTYPE', this.pos))
-            this.pos = this.xml.indexOf('>', this.pos) + 1;
+        }
+        if (this.xml.startsWith('<!DOCTYPE', this.pos)) {
+            const endDoctype = this.xml.indexOf('>', this.pos);
+            this.pos = endDoctype !== -1 ? endDoctype + 1 : this.xml.length;
+        }
         while (this.xml[this.pos] === ' ' ||
             this.xml[this.pos] === '\n' ||
             this.xml[this.pos] === '\t' ||
-            this.xml[this.pos] === '\r')
+            this.xml[this.pos] === '\r') {
             this.pos++;
+        }
     }
     skipToNextImportantChar() {
         const nextTagOpen = this.xml.indexOf('<', this.pos);
         const nextTagClose = this.xml.indexOf('>', this.pos);
-        this.pos = nextTagOpen < nextTagClose && nextTagOpen !== -1 ? nextTagOpen : nextTagClose;
+        if (nextTagOpen === -1 && nextTagClose === -1)
+            return;
+        if (nextTagOpen !== -1 && nextTagClose !== -1) {
+            this.pos = Math.min(nextTagOpen, nextTagClose);
+        }
+        else if (nextTagOpen === -1) {
+            this.pos = nextTagClose;
+        }
+        else {
+            this.pos = nextTagOpen;
+        }
     }
     parseTag() {
         const firstSpace = this.xml.indexOf(' ', this.pos);
         const firstClosure = this.xml.indexOf('>', this.pos);
+        if (firstClosure === -1)
+            return false;
         const endOfTagName = firstSpace !== -1 && firstSpace < firstClosure ? firstSpace : firstClosure;
         if (endOfTagName === -1)
             return false;
@@ -134,12 +160,15 @@ export default class XMLParser {
             let nextSpace = this.xml.indexOf(' ', this.pos);
             const nextEqual = this.xml.indexOf('=', this.pos);
             let endOfTag = this.xml.indexOf('>', this.pos);
-            if (nextSpace === -1 || (nextEqual !== -1 && nextEqual < nextSpace))
+            if (nextSpace === -1 || (nextEqual !== -1 && nextEqual < nextSpace)) {
                 nextSpace = nextEqual;
-            if (nextSpace === -1 || nextSpace > endOfTag)
+            }
+            if (nextSpace === -1 || nextSpace > endOfTag) {
                 nextSpace = endOfTag;
-            if (nextSpace === this.pos || nextSpace === -1)
+            }
+            if (nextSpace === this.pos || nextSpace === -1) {
                 break;
+            }
             const attrName = '@' + this.xml.substring(this.pos, nextSpace);
             this.pos = nextSpace + 1;
             while (this.xml[this.pos] === ' ' && this.pos < endOfTag)
@@ -163,8 +192,9 @@ export default class XMLParser {
                 else {
                     let spaceOrEndTag = this.xml.indexOf(' ', this.pos);
                     endOfTag = this.xml.indexOf('>', this.pos);
-                    if (spaceOrEndTag === -1 || spaceOrEndTag > endOfTag)
+                    if (spaceOrEndTag === -1 || spaceOrEndTag > endOfTag) {
                         spaceOrEndTag = endOfTag;
+                    }
                     const attrValue = this.xml.substring(this.pos, spaceOrEndTag);
                     attrs[attrName] = isNaN(Number(attrValue)) ? attrValue : Number(attrValue);
                     this.pos = spaceOrEndTag;
@@ -184,8 +214,50 @@ export default class XMLParser {
     }
     parseTextContent(startPos) {
         const endPos = this.xml.indexOf('<', startPos);
+        if (endPos === -1) {
+            const text = this.xml.substring(startPos).trim();
+            this.pos = this.xml.length;
+            return text;
+        }
         const textContent = this.xml.substring(startPos, endPos).trim();
         this.pos = endPos;
         return textContent;
+    }
+    skipAttributesAndBlock(tagName) {
+        const endOfTag = this.xml.indexOf('>', this.pos);
+        if (endOfTag === -1) {
+            this.pos = this.xml.length;
+            return;
+        }
+        const maybeSlash = this.xml.lastIndexOf('/', endOfTag);
+        if (maybeSlash !== -1) {
+            const tagContent = this.xml.substring(maybeSlash, endOfTag).trim();
+            if (tagContent === '/') {
+                this.pos = endOfTag + 1;
+                return;
+            }
+        }
+        this.pos = endOfTag + 1;
+        let level = 1;
+        while (this.pos < this.xml.length && level > 0) {
+            const nextOpen = this.xml.indexOf('<', this.pos);
+            if (nextOpen === -1) {
+                this.pos = this.xml.length;
+                break;
+            }
+            this.pos = nextOpen;
+            if (this.xml.startsWith(`</${tagName}`, this.pos)) {
+                level--;
+            }
+            else if (this.xml.startsWith(`<${tagName}`, this.pos)) {
+                level++;
+            }
+            const nextClose = this.xml.indexOf('>', this.pos + 1);
+            if (nextClose === -1) {
+                this.pos = this.xml.length;
+                break;
+            }
+            this.pos = nextClose + 1;
+        }
     }
 }

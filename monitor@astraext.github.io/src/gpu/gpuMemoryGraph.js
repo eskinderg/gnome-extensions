@@ -97,15 +97,13 @@ export default GObject.registerClass(class GpuMemoryGraph extends GraphBase {
         if (this.history && this.history.length > 0) {
             const pointSpacing = width / (this.historyLimit - 1);
             const baseX = (this.historyLimit - historyLength) * pointSpacing;
-            const selectedGpu = Utils.gpuMonitor.getSelectedGpu();
-            const selectedPci = selectedGpu
-                ? `${selectedGpu.domain}:${selectedGpu.bus}.${selectedGpu.slot}`
-                : '';
+            const mainGpu = Utils.gpuMonitor.getMainGpu();
+            const mainPci = Utils.getPCI(mainGpu);
             ctx.setSourceRGBA(this.colors[0].red, this.colors[0].green, this.colors[0].blue, this.colors[0].alpha);
             const totalFunc = (node) => {
-                if (!node || !selectedGpu)
+                if (!node || !mainGpu)
                     return 0;
-                const gpuData = node.get(selectedPci);
+                const gpuData = node.get(mainPci);
                 if (!gpuData || !gpuData.vram || Number.isNaN(gpuData.vram.percent))
                     return 0;
                 return (gpuData.vram.percent ?? 0) / 100.0;

@@ -25,6 +25,7 @@ import CancellableTaskManager from '../utils/cancellableTaskManager.js';
 import PromiseValueHolder, { PromiseValueHolderStore } from '../utils/promiseValueHolder.js';
 import TopProcessesCache from '../utils/topProcessesCache.js';
 import ContinuousTaskManager from '../utils/continuousTaskManager.js';
+import CommandHelper from '../utils/commandHelper.js';
 export default class StorageMonitor extends Monitor {
     static get TOP_PROCESSES_LIMIT() {
         return 10;
@@ -343,7 +344,8 @@ export default class StorageMonitor extends Monitor {
             if (!disk || !disk.path)
                 return false;
             const path = disk.path.replace(/[^a-zA-Z0-9/-]/g, '');
-            const result = await Utils.executeCommandAsync(`lsblk -Jb -o ID,SIZE,FSUSE% ${path}`, this.updateStorageUsageTask);
+            const lsblkPath = Utils.commandPathLookup('lsblk -V');
+            const result = await CommandHelper.runCommand(`${lsblkPath}lsblk -Jb -o ID,SIZE,FSUSE% ${path}`, this.updateStorageUsageTask);
             if (result) {
                 const json = JSON.parse(result);
                 if (json.blockdevices && json.blockdevices.length > 0) {
@@ -671,7 +673,8 @@ export default class StorageMonitor extends Monitor {
     }
     async updateStorageInfo() {
         try {
-            const result = await Utils.executeCommandAsync('lsblk -JbO', this.updateStorageInfoTask);
+            const path = Utils.commandPathLookup('lsblk -V');
+            const result = await CommandHelper.runCommand(`${path}lsblk -JbO`, this.updateStorageInfoTask);
             const map = new Map();
             const blockToInfo = (data) => {
                 const deviceInfo = {};

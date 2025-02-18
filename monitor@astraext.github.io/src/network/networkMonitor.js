@@ -24,6 +24,7 @@ import Monitor from '../monitor.js';
 import CancellableTaskManager from '../utils/cancellableTaskManager.js';
 import PromiseValueHolder, { PromiseValueHolderStore } from '../utils/promiseValueHolder.js';
 import ContinuousTaskManager from '../utils/continuousTaskManager.js';
+import CommandHelper from '../utils/commandHelper.js';
 export default class NetworkMonitor extends Monitor {
     static get TOP_PROCESSES_LIMIT() {
         return 10;
@@ -57,13 +58,6 @@ export default class NetworkMonitor extends Monitor {
         });
         Config.connect(this, 'changed::network-update', this.restart.bind(this));
         this.ignored = Config.get_json('network-ignored');
-        this.ignored = [];
-        // this.ignored.push("enp0s31f6");
-        this.ignored.push("nm-bridge");
-        this.ignored.push("lo");
-        this.ignored.push("vnet0");
-        // console.log(this.ignored)
-
         if (this.ignored === null || !Array.isArray(this.ignored))
             this.ignored = [];
         Config.connect(this, 'changed::network-ignored', () => {
@@ -558,7 +552,7 @@ export default class NetworkMonitor extends Monitor {
         const path = Utils.commandPathLookup('iwconfig --version');
         let result = '';
         try {
-            result = await Utils.executeCommandAsync(`${path}iwconfig`);
+            result = await CommandHelper.runCommand(`${path}iwconfig`);
         }
         catch (e) {
         }
@@ -622,7 +616,7 @@ export default class NetworkMonitor extends Monitor {
             devicePromises.push((async () => {
                 try {
                     const path = Utils.commandPathLookup('iw --version');
-                    const str = await Utils.executeCommandAsync(`${path}iw dev ${dev} link`);
+                    const str = await CommandHelper.runCommand(`${path}iw dev ${dev} link`);
                     if (!str)
                         return;
                     const data = { name: dev };

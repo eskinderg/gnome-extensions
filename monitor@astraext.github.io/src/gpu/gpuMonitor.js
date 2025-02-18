@@ -22,6 +22,9 @@ import Config from '../config.js';
 import Utils from '../utils/utils.js';
 import Monitor from '../monitor.js';
 import ContinuousTaskManager from '../utils/continuousTaskManager.js';
+import CancellableTaskManager from '../utils/cancellableTaskManager.js';
+import CommandHelper from '../utils/commandHelper.js';
+import { EdidParser } from '../utils/edidParser.js';
 var GpuSensorPriority;
 (function (GpuSensorPriority) {
     GpuSensorPriority[GpuSensorPriority["NONE"] = 0] = "NONE";
@@ -35,6 +38,8 @@ export default class GpuMonitor extends Monitor {
         super('Gpu Monitor');
         this.status = false;
         this.infoPipesCacheTime = 0;
+        this.monitoredGPUs = undefined;
+        this.updateDisplaysTask = new CancellableTaskManager();
         this.updateAmdGpuTask = new ContinuousTaskManager();
         this.updateAmdGpuTask.listen(this, this.updateAmdGpu.bind(this));
         this.updateNvidiaGpuTask = new ContinuousTaskManager();
@@ -42,18 +47,27 @@ export default class GpuMonitor extends Monitor {
         this.reset();
         Config.connect(this, 'changed::gpu-header-show', this.updateMonitorStatus.bind(this));
         Config.connect(this, 'changed::gpu-update', this.restart.bind(this));
-        const updateGpu = () => {
-            this.selectedGpu = Utils.getSelectedGPU();
+        const updateMainGpu = () => {
+            this.mainGpu = Utils.getMainGPU();
         };
-        Config.connect(this, 'changed::gpu-main', updateGpu.bind(this));
-        updateGpu();
+        Config.connect(this, 'changed::gpu-main', updateMainGpu.bind(this));
+        updateMainGpu();
+        const updateMonitoredGPUs = () => {
+            this.monitoredGPUs = Utils.getMonitoredGPUs();
+            this.updateMonitorStatus();
+        };
+        Config.connect(this, 'changed::gpu-data', updateMonitoredGPUs.bind(this));
+        updateMonitoredGPUs();
         this.updateMonitorStatus();
     }
     get updateFrequency() {
         return Config.get_double('gpu-update');
     }
-    getSelectedGpu() {
-        return this.selectedGpu;
+    getMainGpu() {
+        return this.mainGpu;
+    }
+    getMonitoredGPUs() {
+        return this.monitoredGPUs;
     }
     updateMonitorStatus() {
         if (Config.get_boolean('gpu-header-show') || this.isListeningFor('gpuUpdateProcessor')) {
@@ -69,15 +83,16 @@ export default class GpuMonitor extends Monitor {
         super.restart();
     }
     reset() {
+        this.updateDisplaysTask.cancel();
         this.infoPipesCache = undefined;
         this.infoPipesCacheTime = 0;
     }
     start() {
+        this.startGpuTask();
         if (this.status)
             return;
         this.status = true;
         super.start();
-        this.startGpuTask();
     }
     stop() {
         if (!this.status)
@@ -100,10 +115,17 @@ export default class GpuMonitor extends Monitor {
         }
     }
     startGpuTask() {
-        const selectedGpu = Utils.getSelectedGPU();
-        if (!selectedGpu)
+        const monitoredGPUs = Utils.getMonitoredGPUs();
+        if (!monitoredGPUs)
             return;
-        if (Utils.hasAMDGpu() && Utils.hasAmdGpuTop() && Utils.isAmdGpu(selectedGpu)) {
+        let hasAMD = false;
+        for (const gpu of monitoredGPUs) {
+            if (Utils.isAmdGpu(gpu)) {
+                hasAMD = true;
+                break;
+            }
+        }
+        if (hasAMD && Utils.hasAmdGpuTop() && !this.updateAmdGpuTask.isRunning) {
             const timer = Math.round(Math.max(500, this.updateFrequency * 1000));
             const path = Utils.commandPathLookup('amdgpu_top --version');
             if (path === false) {
@@ -114,7 +136,14 @@ export default class GpuMonitor extends Monitor {
                 flush: { always: true },
             });
         }
-        if (Utils.hasNVidiaGpu() && Utils.hasNvidiaSmi() && Utils.isNvidiaGpu(selectedGpu)) {
+        let hasNvidia = false;
+        for (const gpu of monitoredGPUs) {
+            if (Utils.isNvidiaGpu(gpu)) {
+                hasNvidia = true;
+                break;
+            }
+        }
+        if (hasNvidia && Utils.hasNvidiaSmi() && !this.updateNvidiaGpuTask.isRunning) {
             const timer = Math.round(Math.max(500, this.updateFrequency * 1000));
             const path = Utils.commandPathLookup('nvidia-smi --version');
             this.updateNvidiaGpuTask.start(`${path}nvidia-smi -q -x -lms ${timer}`, {
@@ -130,10 +159,29 @@ export default class GpuMonitor extends Monitor {
     }
     update() {
         Utils.verbose('Updating Gpu Monitor');
+        if (this.isListeningFor('displays')) {
+            this.runUpdate('displays');
+        }
         return true;
     }
     requestUpdate(key) {
+        if (key === 'displays') {
+            if (!this.updateDisplaysTask.isRunning) {
+                this.runUpdate('displays');
+            }
+        }
         super.requestUpdate(key);
+    }
+    runUpdate(key, ...params) {
+        if (key === 'displays') {
+            this.runTask({
+                key,
+                task: this.updateDisplaysTask,
+                run: this.updateDisplays.bind(this, ...params),
+                callback: this.notify.bind(this, 'displays'),
+            });
+            return;
+        }
     }
     static nvidiaToGenericField(nvidia, plainText = false) {
         if (!nvidia || !nvidia['#text'] || nvidia['#text'] === 'N/A')
@@ -723,7 +771,7 @@ export default class GpuMonitor extends Monitor {
         if (data.exit || !data.result)
             return;
         try {
-            const xml = Utils.xmlParse(data.result);
+            const xml = Utils.xmlParse(data.result, ['supported_clocks']);
             if (!xml.nvidia_smi_log)
                 return;
             let gpuInfoList = xml.nvidia_smi_log.gpu;
@@ -917,6 +965,9 @@ export default class GpuMonitor extends Monitor {
                     const usedData = GpuMonitor.nvidiaToGenericField(gpuInfo.fb_memory_usage.used);
                     if (usedData && usedData.value != null && usedData.unit)
                         gpu.vram.used = Utils.convertToBytes(usedData.value, usedData.unit);
+                    const reservedData = GpuMonitor.nvidiaToGenericField(gpuInfo.fb_memory_usage.reserved);
+                    if (reservedData && reservedData.value != null && reservedData.unit)
+                        gpu.vram.reserved = Utils.convertToBytes(reservedData.value, reservedData.unit);
                     if (gpu.vram.total !== undefined && gpu.vram.used !== undefined) {
                         gpu.vram.percent = (gpu.vram.used / gpu.vram.total) * 100;
                         gpu.vram.pipes.push({
@@ -1035,9 +1086,11 @@ export default class GpuMonitor extends Monitor {
                     gpu.sensors.list?.push(sensor);
                 };
                 if (gpuInfo.pci) {
-                    if (gpuInfo.pci.pci_gpu_link_info && gpuInfo.pci.link_widths) {
-                        const maxLinkGen = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.max_link_gen);
-                        const maxLinkWidth = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.link_widths.max_link_width);
+                    if (gpuInfo.pci.pci_gpu_link_info &&
+                        gpuInfo.pci.pci_gpu_link_info.pcie_gen &&
+                        gpuInfo.pci.pci_gpu_link_info.link_widths) {
+                        const maxLinkGen = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.pcie_gen.max_link_gen);
+                        const maxLinkWidth = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.link_widths.max_link_width);
                         if (maxLinkGen && maxLinkWidth && maxLinkGen.value && maxLinkWidth.value) {
                             addSensor({
                                 category: 'PCIe Link',
@@ -1047,8 +1100,8 @@ export default class GpuMonitor extends Monitor {
                                 priority: GpuSensorPriority.NONE,
                             });
                         }
-                        const currentLinkGen = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.current_link_gen);
-                        const currentLinkWidth = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.link_widths.current_link_width);
+                        const currentLinkGen = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.pcie_gen.current_link_gen);
+                        const currentLinkWidth = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.link_widths.current_link_width);
                         if (currentLinkGen &&
                             currentLinkWidth &&
                             currentLinkGen.value &&
@@ -1061,22 +1114,16 @@ export default class GpuMonitor extends Monitor {
                                 priority: GpuSensorPriority.NONE,
                             });
                         }
-                        const deviceCurrentLinkGen = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.device_current_link_gen);
-                        if (deviceCurrentLinkGen && deviceCurrentLinkGen.value) {
+                        const deviceCurrentLinkGen = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.pcie_gen.device_current_link_gen);
+                        const deviceCurrentLinkWidth = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.pci_gpu_link_info.link_widths.current_link_width);
+                        if (deviceCurrentLinkGen &&
+                            deviceCurrentLinkGen.value &&
+                            deviceCurrentLinkWidth &&
+                            deviceCurrentLinkWidth.value) {
                             addSensor({
                                 category: 'PCIe Link',
-                                name: 'Device Current Link Gen',
-                                value: `Gen${deviceCurrentLinkGen.value}`,
-                                unit: '',
-                                priority: GpuSensorPriority.NONE,
-                            });
-                        }
-                        const deviceCurrentLinkWidth = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.link_widths.current_link_width);
-                        if (deviceCurrentLinkWidth && deviceCurrentLinkWidth.value) {
-                            addSensor({
-                                category: 'PCIe Link',
-                                name: 'Device Current Link Width',
-                                value: `x${deviceCurrentLinkWidth.value}`,
+                                name: 'Device Current Link',
+                                value: `Gen${deviceCurrentLinkGen.value}x${deviceCurrentLinkWidth.value}`,
                                 unit: '',
                                 priority: GpuSensorPriority.NONE,
                             });
@@ -1084,21 +1131,27 @@ export default class GpuMonitor extends Monitor {
                     }
                     const txUtil = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.tx_util);
                     if (txUtil && txUtil.value && txUtil.unit) {
+                        const bytes = Utils.convertToBytes(txUtil.value, txUtil.unit.replace('/s', ''));
+                        const formatted = Utils.formatBytesPerSec(bytes, 'kB/s', 3);
+                        const [value, unit] = formatted.split(' ');
                         addSensor({
                             category: 'PCIe Link',
                             name: 'TX Util',
-                            value: txUtil.value,
-                            unit: txUtil.unit,
+                            value: value,
+                            unit: unit,
                             priority: GpuSensorPriority.NONE,
                         });
                     }
                     const rxUtil = GpuMonitor.nvidiaToGenericField(gpuInfo.pci.rx_util);
                     if (rxUtil && rxUtil.value && rxUtil.unit) {
+                        const bytes = Utils.convertToBytes(rxUtil.value, rxUtil.unit.replace('/s', ''));
+                        const formatted = Utils.formatBytesPerSec(bytes, 'kB/s', 3);
+                        const [value, unit] = formatted.split(' ');
                         addSensor({
                             category: 'PCIe Link',
                             name: 'RX Util',
-                            value: rxUtil.value,
-                            unit: rxUtil.unit,
+                            value: value,
+                            unit: unit,
                             priority: GpuSensorPriority.NONE,
                         });
                     }
@@ -1362,6 +1415,69 @@ export default class GpuMonitor extends Monitor {
         catch (e) {
             Utils.error('Error updating Nvidia GPU', e);
         }
+    }
+    async updateDisplays() {
+        const data = [];
+        const cardsList = await Utils.listDirAsync('/sys/class/drm');
+        const cards = [];
+        for (const card of cardsList) {
+            if (card.isFolder && /^card[0-9]+$/.test(card.name)) {
+                const promise = CommandHelper.runCommand(`readlink -f /sys/class/drm/${card.name}/device`);
+                cards.push({ name: card.name, pathPromise: promise });
+            }
+        }
+        const results = await Promise.all(cards.map(card => card.pathPromise));
+        const pciRegex = /([0-9a-fA-F]{4}):([0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-9])/gm;
+        async function readDisplayFiles(displayName, files) {
+            const filePromises = files.map(file => Utils.readFileAsync(`/sys/class/drm/${displayName}/${file}`, false, file === 'edid' ? 'hex' : 'utf8')
+                .then((content) => ({ [file]: content.trim() }))
+                .catch(_e => {
+                return { [file]: 'unknown' };
+            }));
+            const fileResults = await Promise.all(filePromises);
+            return Object.assign({}, ...fileResults);
+        }
+        const displayDataPromises = [];
+        for (let i = 0; i < cards.length; i++) {
+            const cardName = cards[i].name;
+            const result = results[i];
+            const matches = Array.from(result.matchAll(pciRegex));
+            if (matches.length > 0) {
+                const lastMatch = matches[matches.length - 1];
+                const pciBus = lastMatch[1];
+                const pciAddress = lastMatch[2];
+                const pciPort = lastMatch[3];
+                const pciFunction = lastMatch[4];
+                for (const display of cardsList) {
+                    if (display.isFolder &&
+                        display.name.startsWith(cardName) &&
+                        display.name !== cardName) {
+                        const connectorName = display.name.replace(`${cardName}-`, '');
+                        const filesToRead = ['status', 'enabled', 'edid'];
+                        const displayFilesPromise = readDisplayFiles(display.name, filesToRead);
+                        const promise = displayFilesPromise.then(files => {
+                            return {
+                                cardName: cardName,
+                                uuid: `${pciBus}:${pciAddress}:${pciPort}.${pciFunction}`,
+                                pciBus: pciBus,
+                                pciAddress: pciAddress,
+                                pciPort: pciPort,
+                                pciFunction: pciFunction,
+                                connector: connectorName,
+                                status: files.status,
+                                enabled: files.enabled === 'enabled',
+                                edid: EdidParser.parseEdid(files.edid) ?? null,
+                            };
+                        });
+                        displayDataPromises.push(promise);
+                    }
+                }
+            }
+        }
+        const displayDataResults = await Promise.all(displayDataPromises);
+        data.push(...displayDataResults);
+        this.pushUsageHistory('displays', data);
+        return true;
     }
     destroy() {
         Config.clear(this);

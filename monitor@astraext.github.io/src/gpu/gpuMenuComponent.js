@@ -19,6 +19,7 @@
  */
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
+import Pango from 'gi://Pango';
 import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 import MenuBase from '../menu.js';
 import Utils from '../utils/utils.js';
@@ -36,44 +37,47 @@ export default class GpuMenuComponent {
             this.compact = params.compact;
         if (params.title)
             this.title = params.title;
+        this.topProcesses = new Map();
+        this.mainSensors = new Map();
         this.init();
     }
     init() {
         if (this.title) {
             this.title.text = _('GPU');
-            Config.connect(this.title, 'changed::gpu-main', () => {
-                const gpu = Utils.gpuMonitor.getSelectedGpu();
+            Config.connect(this.title, 'changed::gpu-data', () => {
+                const gpu = Utils.gpuMonitor.getMonitoredGPUs();
                 if (this.title)
                     this.title.visible = !!gpu;
             });
         }
         this.container = new Grid({ numCols: 2, styleClass: 'astra-monitor-menu-subgrid' });
         const GPUsList = Utils.getGPUsList();
-        if (GPUsList.length === 0) {
+        if (!GPUsList || GPUsList.length === 0) {
             this.noGPULabel = new St.Label({
                 text: _('No GPU found'),
                 styleClass: 'astra-monitor-menu-label-warning',
                 style: 'font-style:italic;',
             });
-            Config.connect(this.noGPULabel, 'changed::gpu-main', () => {
-                const gpu = Utils.gpuMonitor.getSelectedGpu();
+            Config.connect(this.noGPULabel, 'changed::gpu-data', () => {
+                const gpus = Utils.getGPUsList();
                 if (this.noGPULabel)
-                    this.noGPULabel.visible = !!gpu;
+                    this.noGPULabel.visible = !gpus || gpus.length === 0;
             });
             this.container.addToGrid(this.noGPULabel, 2);
             return;
         }
         if (GPUsList.length > 1 && this.title)
             this.title.text = _('GPUs');
-        const selectedGpu = Utils.gpuMonitor.getSelectedGpu();
         for (let i = 0; i < GPUsList.length; i++) {
-            const section = this.createSection(GPUsList[i], selectedGpu);
+            const gpu = GPUsList[i];
+            const section = this.createSection(gpu);
             this.sections.push(section);
         }
     }
-    createSection(gpuInfo, selectedGpu) {
+    createSection(gpuInfo) {
         const section = {
             info: gpuInfo,
+            uuid: Utils.getGpuUUID(gpuInfo),
             vram: {},
             activity: {},
         };
@@ -100,285 +104,326 @@ export default class GpuMenuComponent {
                 infoPopup.close(true);
         });
         grid.addToGrid(infoButton);
-        const selected = selectedGpu?.domain === gpuInfo.domain &&
-            selectedGpu?.bus === gpuInfo.bus &&
-            selectedGpu?.slot === gpuInfo.slot;
-        const amd = Utils.isAmdGpu(gpuInfo) && Utils.hasAmdGpuTop();
-        const nvidia = Utils.isNvidiaGpu(gpuInfo) && Utils.hasNvidiaSmi();
-        if (selected && (amd || nvidia)) {
-            const activityButton = new St.Button({
-                reactive: true,
-                trackHover: true,
-                style: defaultStyle,
-                xExpand: true,
+        const displaysButton = new St.Button({
+            reactive: true,
+            trackHover: true,
+            style: defaultStyle,
+            xExpand: true,
+        });
+        const displaysGrid = new Grid({ numCols: 1 });
+        displaysButton.set_child(displaysGrid);
+        const displaysPopup = this.createDisplaysPopup(displaysButton, gpuInfo);
+        section.displaysPopup = displaysPopup;
+        displaysButton.connect('enter-event', () => {
+            displaysButton.style = defaultStyle + this.parent.selectionStyle;
+            if (displaysPopup)
+                displaysPopup.open(true);
+        });
+        displaysButton.connect('leave-event', () => {
+            displaysButton.style = defaultStyle;
+            if (displaysPopup)
+                displaysPopup.close(true);
+        });
+        grid.addToGrid(displaysButton);
+        const displaysTitle = new St.Label({
+            text: _('No Connected Display'),
+            styleClass: 'astra-monitor-menu-header-small-centered',
+            xExpand: true,
+        });
+        section.displaysTitle = displaysTitle;
+        displaysGrid.addToGrid(displaysTitle);
+        const activityButton = new St.Button({
+            reactive: true,
+            trackHover: true,
+            style: defaultStyle,
+            xExpand: true,
+        });
+        const activityGrid = new Grid({ numCols: 1 });
+        activityButton.set_child(activityGrid);
+        const activityPopup = this.createActivityPopup(activityButton, gpuInfo);
+        section.activityPopup = activityPopup;
+        activityButton.connect('enter-event', () => {
+            activityButton.style = defaultStyle + this.parent.selectionStyle;
+            if (activityPopup)
+                activityPopup.open(true);
+        });
+        activityButton.connect('leave-event', () => {
+            activityButton.style = defaultStyle;
+            if (activityPopup)
+                activityPopup.close(true);
+        });
+        grid.addToGrid(activityButton);
+        const activityTitle = new St.Label({
+            text: _('Activity'),
+            styleClass: 'astra-monitor-menu-header-small-centered',
+        });
+        activityGrid.addToGrid(activityTitle);
+        {
+            const barGrid = new Grid({
+                styleClass: 'astra-monitor-menu-subgrid',
             });
-            const activityGrid = new Grid({ numCols: 1 });
-            activityButton.set_child(activityGrid);
-            const activityPopup = this.createActivityPopup(activityButton, gpuInfo);
-            section.activityPopup = activityPopup;
-            activityButton.connect('enter-event', () => {
-                activityButton.style = defaultStyle + this.parent.selectionStyle;
-                if (activityPopup)
-                    activityPopup.open(true);
+            const bar = new GpuActivityBars({
+                numBars: 1,
+                width: 200 - 2,
+                height: 0.8,
+                mini: false,
+                layout: 'horizontal',
+                xAlign: Clutter.ActorAlign.START,
+                style: 'margin-bottom:0;margin-right:0;border:solid 1px #555;',
             });
-            activityButton.connect('leave-event', () => {
-                activityButton.style = defaultStyle;
-                if (activityPopup)
-                    activityPopup.close(true);
+            barGrid.addToGrid(bar);
+            const barUsagePercLabel = new St.Label({
+                text: '0%',
+                style: 'margin-left:0.3em;margin-right:0.3em;padding-top:2px;width:2.8em;font-size:0.8em;text-align:right;',
             });
-            grid.addToGrid(activityButton);
-            const activityTitle = new St.Label({
-                text: _('Activity'),
-                styleClass: 'astra-monitor-menu-header-small-centered',
-            });
-            activityGrid.addToGrid(activityTitle);
-            {
-                const barGrid = new Grid({
-                    styleClass: 'astra-monitor-menu-subgrid',
-                });
-                const bar = new GpuActivityBars({
-                    numBars: 1,
-                    width: 200 - 2,
-                    height: 0.8,
-                    mini: false,
-                    layout: 'horizontal',
-                    xAlign: Clutter.ActorAlign.START,
-                    style: 'margin-bottom:0;margin-right:0;border:solid 1px #555;',
-                });
-                barGrid.addToGrid(bar);
-                const barUsagePercLabel = new St.Label({
-                    text: '0%',
-                    style: 'margin-left:0.3em;margin-right:0.3em;padding-top:2px;width:2.8em;font-size:0.8em;text-align:right;',
-                });
-                barGrid.addToGrid(barUsagePercLabel);
-                activityGrid.addToGrid(barGrid);
-                section.activity.gfxBar = bar;
-                section.activity.gfxBarLabel = barUsagePercLabel;
-            }
-            const vramButton = new St.Button({
-                reactive: true,
-                trackHover: true,
-                style: defaultStyle,
-                xExpand: true,
-            });
-            const vramGrid = new Grid({ numCols: 1 });
-            vramButton.set_child(vramGrid);
-            const vramPopup = this.createVramPopup(vramButton, gpuInfo);
-            section.vramPopup = vramPopup;
-            vramButton.connect('enter-event', () => {
-                vramButton.style = defaultStyle + this.parent.selectionStyle;
-                if (vramPopup)
-                    vramPopup.open(true);
-            });
-            vramButton.connect('leave-event', () => {
-                vramButton.style = defaultStyle;
-                if (vramPopup)
-                    vramPopup.close(true);
-            });
-            grid.addToGrid(vramButton);
-            const vramTitle = new St.Label({
-                text: _('VRAM'),
-                styleClass: 'astra-monitor-menu-header-small-centered',
-            });
-            vramGrid.addToGrid(vramTitle);
-            {
-                const barGrid = new Grid({
-                    styleClass: 'astra-monitor-menu-subgrid',
-                });
-                const bar = new GpuMemoryBars({
-                    numBars: 1,
-                    width: 200 - 2,
-                    height: 0.8,
-                    mini: false,
-                    layout: 'horizontal',
-                    xAlign: Clutter.ActorAlign.START,
-                    style: 'margin-bottom:0;margin-right:0;border:solid 1px #555;',
-                });
-                barGrid.addToGrid(bar);
-                const barUsagePercLabel = new St.Label({
-                    text: '0%',
-                    style: 'margin-left:0.3em;margin-right:0.3em;padding-top:2px;width:2.8em;font-size:0.8em;text-align:right;',
-                });
-                barGrid.addToGrid(barUsagePercLabel);
-                vramGrid.addToGrid(barGrid);
-                section.vram.bar = bar;
-                section.vram.barLabel = barUsagePercLabel;
-            }
-            {
-                const vramContainer = new St.Widget({
-                    layoutManager: new Clutter.GridLayout({
-                        orientation: Clutter.Orientation.HORIZONTAL,
-                    }),
-                    xExpand: true,
-                    style: 'margin-right:0;',
-                });
-                const usedContainer = new St.Widget({
-                    layoutManager: new Clutter.GridLayout({
-                        orientation: Clutter.Orientation.HORIZONTAL,
-                    }),
-                    xExpand: true,
-                    style: 'margin-left:0;margin-right:0;',
-                });
-                const usedLabel = new St.Label({
-                    text: _('Used:'),
-                    styleClass: 'astra-monitor-menu-label',
-                    style: 'padding-right:0.15em;',
-                });
-                usedContainer.add_child(usedLabel);
-                const usedValueLabel = new St.Label({
-                    text: '-',
-                    xExpand: true,
-                    styleClass: 'astra-monitor-menu-key-mid',
-                });
-                usedContainer.add_child(usedValueLabel);
-                usedContainer.set_width(100);
-                vramContainer.add_child(usedContainer);
-                const totalContainer = new St.Widget({
-                    layoutManager: new Clutter.GridLayout({
-                        orientation: Clutter.Orientation.HORIZONTAL,
-                    }),
-                    xExpand: true,
-                    style: 'margin-left:0;margin-right:0;',
-                });
-                const totalLabel = new St.Label({
-                    text: _('Total:'),
-                    styleClass: 'astra-monitor-menu-label',
-                    style: 'padding-right:0.15em;',
-                });
-                totalContainer.add_child(totalLabel);
-                const totalValueLabel = new St.Label({
-                    text: '-',
-                    xExpand: true,
-                    styleClass: 'astra-monitor-menu-key-mid',
-                });
-                totalContainer.add_child(totalValueLabel);
-                totalContainer.set_width(100);
-                vramContainer.add_child(totalContainer);
-                vramGrid.addToGrid(vramContainer);
-                section.vram.usedLabel = usedValueLabel;
-                section.vram.totalLabel = totalValueLabel;
-            }
-            const topProcessesButton = new St.Button({
-                reactive: true,
-                trackHover: true,
-                style: defaultStyle,
-                xExpand: true,
-            });
-            const topProcessesGrid = new Grid({ numCols: 1 });
-            topProcessesButton.set_child(topProcessesGrid);
-            const topProcessesPopup = this.createTopProcessesPopup(topProcessesButton, gpuInfo);
-            section.topProcessesPopup = topProcessesPopup;
-            topProcessesButton.connect('enter-event', () => {
-                topProcessesButton.style = defaultStyle + this.parent.selectionStyle;
-                if (topProcessesPopup)
-                    topProcessesPopup.open(true);
-            });
-            topProcessesButton.connect('leave-event', () => {
-                topProcessesButton.style = defaultStyle;
-                if (topProcessesPopup)
-                    topProcessesPopup.close(true);
-            });
-            const topProcessesTitle = new St.Label({
-                text: _('Top Processes'),
-                styleClass: 'astra-monitor-menu-header-small-centered',
-            });
-            topProcessesGrid.addToGrid(topProcessesTitle);
-            {
-                const listGrid = new Grid({
-                    numCols: 3,
-                    styleClass: 'astra-monitor-menu-subgrid',
-                });
-                this.topProcesses = [];
-                const numProcesses = this.compact ? 3 : 5;
-                for (let i = 0; i < numProcesses; i++) {
-                    const label = new St.Label({
-                        text: '-',
-                        styleClass: 'astra-monitor-menu-cmd-name',
-                        xExpand: true,
-                    });
-                    listGrid.addToGrid(label);
-                    const value1 = new St.Label({
-                        text: '-',
-                        styleClass: 'astra-monitor-menu-cmd-usage',
-                        xExpand: true,
-                    });
-                    listGrid.addToGrid(value1);
-                    const value2 = new St.Label({
-                        text: '-',
-                        styleClass: 'astra-monitor-menu-cmd-usage',
-                        xExpand: true,
-                    });
-                    listGrid.addToGrid(value2);
-                    this.topProcesses.push({ label, value1, value2 });
-                }
-                topProcessesGrid.addToGrid(listGrid);
-            }
-            grid.addToGrid(topProcessesButton);
-            const sensorsButton = new St.Button({
-                reactive: true,
-                trackHover: true,
-                style: defaultStyle,
-                xExpand: true,
-            });
-            const sensorsPopup = this.createSensorsPopup(sensorsButton, gpuInfo);
-            section.sensorsPopup = sensorsPopup;
-            sensorsButton.connect('enter-event', () => {
-                sensorsButton.style = defaultStyle + this.parent.selectionStyle;
-                if (sensorsPopup)
-                    sensorsPopup.open(true);
-            });
-            sensorsButton.connect('leave-event', () => {
-                sensorsButton.style = defaultStyle;
-                if (sensorsPopup)
-                    sensorsPopup.close(true);
-            });
-            const sensorsGrid = new Grid({ numCols: 1 });
-            sensorsButton.set_child(sensorsGrid);
-            const sensorsTitle = new St.Label({
-                text: _('Sensors'),
-                styleClass: 'astra-monitor-menu-header-small-centered',
-            });
-            sensorsGrid.addToGrid(sensorsTitle);
-            {
-                const listGrid = new Grid({
-                    numCols: 2,
-                    styleClass: 'astra-monitor-menu-subgrid',
-                });
-                this.mainSensors = [];
-                const numSensors = this.compact ? 1 : 3;
-                for (let i = 0; i < numSensors; i++) {
-                    const label = new St.Label({
-                        text: '-',
-                        styleClass: 'astra-monitor-menu-cmd-name',
-                        xExpand: true,
-                    });
-                    listGrid.addToGrid(label);
-                    const value = new St.Label({
-                        text: '-',
-                        styleClass: 'astra-monitor-menu-cmd-usage',
-                        xExpand: true,
-                    });
-                    listGrid.addToGrid(value);
-                    this.mainSensors.push({ label, value });
-                }
-                sensorsGrid.addToGrid(listGrid);
-            }
-            grid.addToGrid(sensorsButton);
+            barGrid.addToGrid(barUsagePercLabel);
+            activityGrid.addToGrid(barGrid);
+            section.activity.gfxBar = bar;
+            section.activity.gfxBarLabel = barUsagePercLabel;
         }
+        const vramButton = new St.Button({
+            reactive: true,
+            trackHover: true,
+            style: defaultStyle,
+            xExpand: true,
+        });
+        const vramGrid = new Grid({ numCols: 1 });
+        vramButton.set_child(vramGrid);
+        const vramPopup = this.createVramPopup(vramButton, gpuInfo);
+        section.vramPopup = vramPopup;
+        vramButton.connect('enter-event', () => {
+            vramButton.style = defaultStyle + this.parent.selectionStyle;
+            if (vramPopup)
+                vramPopup.open(true);
+        });
+        vramButton.connect('leave-event', () => {
+            vramButton.style = defaultStyle;
+            if (vramPopup)
+                vramPopup.close(true);
+        });
+        grid.addToGrid(vramButton);
+        const vramTitle = new St.Label({
+            text: _('VRAM'),
+            styleClass: 'astra-monitor-menu-header-small-centered',
+        });
+        vramGrid.addToGrid(vramTitle);
+        {
+            const barGrid = new Grid({
+                styleClass: 'astra-monitor-menu-subgrid',
+            });
+            const bar = new GpuMemoryBars({
+                numBars: 1,
+                width: 200 - 2,
+                height: 0.8,
+                mini: false,
+                layout: 'horizontal',
+                xAlign: Clutter.ActorAlign.START,
+                style: 'margin-bottom:0;margin-right:0;border:solid 1px #555;',
+            });
+            barGrid.addToGrid(bar);
+            const barUsagePercLabel = new St.Label({
+                text: '0%',
+                style: 'margin-left:0.3em;margin-right:0.3em;padding-top:2px;width:2.8em;font-size:0.8em;text-align:right;',
+            });
+            barGrid.addToGrid(barUsagePercLabel);
+            vramGrid.addToGrid(barGrid);
+            section.vram.bar = bar;
+            section.vram.barLabel = barUsagePercLabel;
+        }
+        {
+            const vramContainer = new St.Widget({
+                layoutManager: new Clutter.GridLayout({
+                    orientation: Clutter.Orientation.HORIZONTAL,
+                }),
+                xExpand: true,
+                style: 'margin-right:0;',
+            });
+            const usedContainer = new St.Widget({
+                layoutManager: new Clutter.GridLayout({
+                    orientation: Clutter.Orientation.HORIZONTAL,
+                }),
+                xExpand: true,
+                style: 'margin-left:0;margin-right:0;',
+            });
+            const usedLabel = new St.Label({
+                text: _('Used:'),
+                styleClass: 'astra-monitor-menu-label',
+                style: 'padding-right:0.15em;',
+            });
+            usedContainer.add_child(usedLabel);
+            const usedValueLabel = new St.Label({
+                text: '-',
+                xExpand: true,
+                styleClass: 'astra-monitor-menu-key-mid',
+            });
+            usedContainer.add_child(usedValueLabel);
+            usedContainer.set_width(100);
+            vramContainer.add_child(usedContainer);
+            const totalContainer = new St.Widget({
+                layoutManager: new Clutter.GridLayout({
+                    orientation: Clutter.Orientation.HORIZONTAL,
+                }),
+                xExpand: true,
+                style: 'margin-left:0;margin-right:0;',
+            });
+            const totalLabel = new St.Label({
+                text: _('Total:'),
+                styleClass: 'astra-monitor-menu-label',
+                style: 'padding-right:0.15em;',
+            });
+            totalContainer.add_child(totalLabel);
+            const totalValueLabel = new St.Label({
+                text: '-',
+                xExpand: true,
+                styleClass: 'astra-monitor-menu-key-mid',
+            });
+            totalContainer.add_child(totalValueLabel);
+            totalContainer.set_width(100);
+            vramContainer.add_child(totalContainer);
+            vramGrid.addToGrid(vramContainer);
+            section.vram.usedLabel = usedValueLabel;
+            section.vram.totalLabel = totalValueLabel;
+        }
+        const topProcessesButton = new St.Button({
+            reactive: true,
+            trackHover: true,
+            style: defaultStyle,
+            xExpand: true,
+        });
+        const topProcessesGrid = new Grid({ numCols: 1 });
+        topProcessesButton.set_child(topProcessesGrid);
+        const topProcessesPopup = this.createTopProcessesPopup(topProcessesButton, gpuInfo);
+        section.topProcessesPopup = topProcessesPopup;
+        topProcessesButton.connect('enter-event', () => {
+            topProcessesButton.style = defaultStyle + this.parent.selectionStyle;
+            if (topProcessesPopup)
+                topProcessesPopup.open(true);
+        });
+        topProcessesButton.connect('leave-event', () => {
+            topProcessesButton.style = defaultStyle;
+            if (topProcessesPopup)
+                topProcessesPopup.close(true);
+        });
+        const topProcessesTitle = new St.Label({
+            text: _('Top Processes'),
+            styleClass: 'astra-monitor-menu-header-small-centered',
+        });
+        topProcessesGrid.addToGrid(topProcessesTitle);
+        {
+            const listGrid = new Grid({
+                numCols: 3,
+                styleClass: 'astra-monitor-menu-subgrid',
+            });
+            const processes = [];
+            const numProcesses = this.compact ? 3 : 5;
+            for (let i = 0; i < numProcesses; i++) {
+                const label = new St.Label({
+                    text: '-',
+                    styleClass: 'astra-monitor-menu-cmd-name',
+                    xExpand: true,
+                });
+                listGrid.addToGrid(label);
+                const value1 = new St.Label({
+                    text: '-',
+                    styleClass: 'astra-monitor-menu-cmd-usage',
+                    xExpand: true,
+                });
+                listGrid.addToGrid(value1);
+                const value2 = new St.Label({
+                    text: '-',
+                    styleClass: 'astra-monitor-menu-cmd-usage',
+                    xExpand: true,
+                });
+                listGrid.addToGrid(value2);
+                processes.push({ label, value1, value2 });
+            }
+            this.topProcesses.set(section.uuid, processes);
+            topProcessesGrid.addToGrid(listGrid);
+        }
+        grid.addToGrid(topProcessesButton);
+        const sensorsButton = new St.Button({
+            reactive: true,
+            trackHover: true,
+            style: defaultStyle,
+            xExpand: true,
+        });
+        const sensorsPopup = this.createSensorsPopup(sensorsButton, gpuInfo);
+        section.sensorsPopup = sensorsPopup;
+        sensorsButton.connect('enter-event', () => {
+            sensorsButton.style = defaultStyle + this.parent.selectionStyle;
+            if (sensorsPopup)
+                sensorsPopup.open(true);
+        });
+        sensorsButton.connect('leave-event', () => {
+            sensorsButton.style = defaultStyle;
+            if (sensorsPopup)
+                sensorsPopup.close(true);
+        });
+        const sensorsGrid = new Grid({ numCols: 1 });
+        sensorsButton.set_child(sensorsGrid);
+        const sensorsTitle = new St.Label({
+            text: _('Sensors'),
+            styleClass: 'astra-monitor-menu-header-small-centered',
+        });
+        sensorsGrid.addToGrid(sensorsTitle);
+        {
+            const listGrid = new Grid({
+                numCols: 2,
+                styleClass: 'astra-monitor-menu-subgrid',
+            });
+            const sensors = [];
+            const numSensors = this.compact ? 1 : 3;
+            for (let i = 0; i < numSensors; i++) {
+                const label = new St.Label({
+                    text: '-',
+                    styleClass: 'astra-monitor-menu-cmd-name',
+                    xExpand: true,
+                });
+                listGrid.addToGrid(label);
+                const value = new St.Label({
+                    text: '-',
+                    styleClass: 'astra-monitor-menu-cmd-usage',
+                    xExpand: true,
+                });
+                listGrid.addToGrid(value);
+                sensors.push({ label, value });
+            }
+            this.mainSensors.set(section.uuid, sensors);
+            sensorsGrid.addToGrid(listGrid);
+        }
+        grid.addToGrid(sensorsButton);
         this.container.addToGrid(grid, 2);
-        const updateSelectedGPU = () => {
-            if (gpuInfo === Utils.gpuMonitor.getSelectedGpu()) {
+        const updateMonitoredGPUs = () => {
+            const monitoredGPUs = Utils.gpuMonitor.getMonitoredGPUs();
+            let monitored = false;
+            if (monitoredGPUs) {
+                for (const gpu of monitoredGPUs) {
+                    if (Utils.isSameGpu(gpu, gpuInfo)) {
+                        monitored = true;
+                        break;
+                    }
+                }
+            }
+            if (monitored) {
+                activityButton.visible = true;
+                vramButton.visible = true;
+                topProcessesButton.visible = true;
+                sensorsButton.visible = true;
                 infoLabel.styleClass = 'astra-monitor-menu-label';
             }
             else {
+                activityButton.visible = false;
+                vramButton.visible = false;
+                topProcessesButton.visible = false;
+                sensorsButton.visible = false;
                 if (Utils.themeStyle === 'light')
                     infoLabel.styleClass = 'astra-monitor-menu-unmonitored-light';
                 else
                     infoLabel.styleClass = 'astra-monitor-menu-unmonitored';
             }
         };
-        updateSelectedGPU();
-        Config.connect(this, 'changed::gpu-main', updateSelectedGPU);
+        updateMonitoredGPUs();
+        Config.connect(this, 'changed::gpu-data', updateMonitoredGPUs);
         return section;
     }
     createInfoPopup(sourceActor, gpuInfo) {
@@ -557,6 +602,479 @@ export default class GpuMenuComponent {
                 }
                 valueLabel.text = textData;
                 valueLabel.show();
+            }
+        };
+        return popup;
+    }
+    createDisplaysPopup(sourceActor, gpuInfo) {
+        const popup = new MenuBase(sourceActor, 0.05);
+        popup.addMenuSection(_('Displays'));
+        const noDisplaysLabel = new St.Label({
+            text: _('No displays found'),
+            styleClass: 'astra-monitor-menu-label',
+        });
+        popup.addToMenu(noDisplaysLabel, 2);
+        const grid = new Grid({
+            numCols: 1,
+            xExpand: true,
+            xAlign: Clutter.ActorAlign.START,
+        });
+        popup.addToMenu(grid, 2);
+        popup.displayContainers = [];
+        for (let i = 0; i < 8; i++) {
+            const displayContainer = new Grid({
+                numCols: 2,
+                xExpand: true,
+                xAlign: Clutter.ActorAlign.FILL,
+            });
+            const displayLabel = new St.Label({
+                text: '',
+                xAlign: Clutter.ActorAlign.CENTER,
+                style: 'font-size:0.9em;max-width:250px;',
+            });
+            displayLabel.clutterText.useMarkup = true;
+            displayContainer.addToGrid(displayLabel, 2);
+            const horizontalLine = new St.Widget({
+                reactive: false,
+                style: 'height:1px;width:100%;margin:0 8px;background-color:#888;opacity:0.5;',
+            });
+            displayContainer.addToGrid(horizontalLine, 2);
+            grid.addToGrid(displayContainer, 2);
+            const statusLabel = new St.Label({
+                text: _('Status'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(statusLabel);
+            const statusValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                style: 'width:250px;',
+            });
+            displayContainer.addToGrid(statusValue);
+            const productCodeLabel = new St.Label({
+                text: _('Product Code'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(productCodeLabel);
+            const productCodeValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(productCodeValue);
+            const serialNumberLabel = new St.Label({
+                text: _('Serial Number'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(serialNumberLabel);
+            const serialNumberValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(serialNumberValue);
+            const manufacturerDateLabel = new St.Label({
+                text: _('Manufacturer Date'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(manufacturerDateLabel);
+            const manufacturerDateValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(manufacturerDateValue);
+            const edidVersionLabel = new St.Label({
+                text: _('EDID Version'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(edidVersionLabel);
+            const edidVersionValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(edidVersionValue);
+            const displaySizeLabel = new St.Label({
+                text: _('Display Size'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(displaySizeLabel);
+            const displaySizeValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(displaySizeValue);
+            const nativeResolutionLabel = new St.Label({
+                text: _('Native Resolution'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(nativeResolutionLabel);
+            const nativeResolutionValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(nativeResolutionValue);
+            const refreshRateLabel = new St.Label({
+                text: _('Refresh Rate'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(refreshRateLabel);
+            const refreshRateValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(refreshRateValue);
+            const displayGammaLabel = new St.Label({
+                text: _('Display Gamma'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(displayGammaLabel);
+            const displayGammaValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(displayGammaValue);
+            const displayTypeLabel = new St.Label({
+                text: _('Display Type'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(displayTypeLabel);
+            const displayTypeValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(displayTypeValue);
+            const capabilitiesLabel = new St.Label({
+                text: _('Capabilities'),
+                styleClass: 'astra-monitor-menu-sub-key',
+                xExpand: true,
+            });
+            displayContainer.addToGrid(capabilitiesLabel);
+            const capabilitiesValue = new St.Label({
+                text: '',
+                styleClass: 'astra-monitor-menu-sub-value',
+                xExpand: true,
+                style: 'max-width:250px;',
+            });
+            capabilitiesValue.clutterText.set_line_wrap(true);
+            capabilitiesValue.clutterText.set_line_wrap_mode(Pango.WrapMode.WORD);
+            displayContainer.addToGrid(capabilitiesValue);
+            popup.displayContainers.push({
+                container: displayContainer,
+                label: displayLabel,
+                status: statusValue,
+                productCodeLabel: productCodeLabel,
+                productCodeValue: productCodeValue,
+                serialNumberLabel: serialNumberLabel,
+                serialNumberValue: serialNumberValue,
+                manufacturerDateLabel: manufacturerDateLabel,
+                manufacturerDateValue: manufacturerDateValue,
+                edidVersionLabel: edidVersionLabel,
+                edidVersionValue: edidVersionValue,
+                displaySizeLabel: displaySizeLabel,
+                displaySizeValue: displaySizeValue,
+                nativeResolutionLabel: nativeResolutionLabel,
+                nativeResolutionValue: nativeResolutionValue,
+                refreshRateLabel: refreshRateLabel,
+                refreshRateValue: refreshRateValue,
+                displayGammaLabel: displayGammaLabel,
+                displayGammaValue: displayGammaValue,
+                displayTypeLabel: displayTypeLabel,
+                displayTypeValue: displayTypeValue,
+                capabilitiesLabel: capabilitiesLabel,
+                capabilitiesValue: capabilitiesValue,
+            });
+        }
+        const uuid = Utils.getGpuUUID(gpuInfo);
+        popup.updateData = (data) => {
+            if (data.length > 0)
+                noDisplaysLabel.hide();
+            else
+                noDisplaysLabel.show();
+            const displaysData = data.filter(d => d.uuid === uuid &&
+                d.connector &&
+                !d.connector.toLowerCase().includes('writeback'));
+            for (let i = 0; i < popup.displayContainers.length; i++) {
+                const displayContainer = popup.displayContainers[i];
+                const displayData = displaysData[i];
+                displayContainer.container.show();
+                if (!displayData) {
+                    displayContainer.container.hide();
+                    continue;
+                }
+                let labelText = '';
+                if (displayData.edid?.modelName) {
+                    labelText = displayData.edid.modelName;
+                }
+                else if (displayData.edid?.eisaInfo && displayData.edid.eisaInfo.name) {
+                    labelText = displayData.edid.eisaInfo.name;
+                }
+                if (displayData.connector) {
+                    if (labelText) {
+                        labelText += ` [<b><span color='grey'>${displayData.connector}</span></b>]`;
+                    }
+                    else {
+                        labelText = `[<b><span color='grey'>${displayData.connector}</span></b>]`;
+                    }
+                }
+                if (!labelText) {
+                    displayContainer.container.hide();
+                    continue;
+                }
+                displayContainer.label.clutterText.set_markup(labelText);
+                displayContainer.status.text = Utils.capitalize(displayData.status);
+                if (displayData.enabled) {
+                    displayContainer.status.text += ' - ' + _('Enabled');
+                }
+                else {
+                    displayContainer.status.text += ' - ' + _('Disabled');
+                }
+                if (displayData.status === 'disconnected') {
+                    displayContainer.productCodeLabel.hide();
+                    displayContainer.productCodeValue.hide();
+                    displayContainer.serialNumberLabel.hide();
+                    displayContainer.serialNumberValue.hide();
+                    displayContainer.manufacturerDateLabel.hide();
+                    displayContainer.manufacturerDateValue.hide();
+                    displayContainer.edidVersionLabel.hide();
+                    displayContainer.edidVersionValue.hide();
+                    displayContainer.displaySizeLabel.hide();
+                    displayContainer.displaySizeValue.hide();
+                    displayContainer.nativeResolutionLabel.hide();
+                    displayContainer.nativeResolutionValue.hide();
+                    displayContainer.refreshRateLabel.hide();
+                    displayContainer.refreshRateValue.hide();
+                    displayContainer.displayGammaLabel.hide();
+                    displayContainer.displayGammaValue.hide();
+                    displayContainer.displayTypeLabel.hide();
+                    displayContainer.displayTypeValue.hide();
+                    displayContainer.capabilitiesLabel.hide();
+                    displayContainer.capabilitiesValue.hide();
+                    continue;
+                }
+                if (displayData.edid?.productCode) {
+                    displayContainer.productCodeValue.text =
+                        '0x' + displayData.edid.productCode?.toString(16).toUpperCase() || '';
+                    displayContainer.productCodeLabel.show();
+                    displayContainer.productCodeValue.show();
+                }
+                else {
+                    displayContainer.productCodeLabel.hide();
+                    displayContainer.productCodeValue.hide();
+                }
+                if (displayData.edid?.serialNumber) {
+                    if (typeof displayData.edid.serialNumber === 'number') {
+                        displayContainer.serialNumberValue.text =
+                            '0x' + displayData.edid.serialNumber.toString(16).toUpperCase();
+                    }
+                    else {
+                        displayContainer.serialNumberValue.text =
+                            displayData.edid.serialNumber?.toString() || '';
+                    }
+                    displayContainer.serialNumberLabel.show();
+                    displayContainer.serialNumberValue.show();
+                }
+                else {
+                    displayContainer.serialNumberLabel.hide();
+                    displayContainer.serialNumberValue.hide();
+                }
+                if (displayData.edid?.manufactureDate) {
+                    displayContainer.manufacturerDateValue.text = displayData.edid.manufactureDate;
+                    displayContainer.manufacturerDateLabel.show();
+                    displayContainer.manufacturerDateValue.show();
+                }
+                else {
+                    displayContainer.manufacturerDateLabel.hide();
+                    displayContainer.manufacturerDateValue.hide();
+                }
+                if (displayData.edid?.edidVersion) {
+                    displayContainer.edidVersionValue.text = displayData.edid.edidVersion;
+                    displayContainer.edidVersionLabel.show();
+                    displayContainer.edidVersionValue.show();
+                }
+                else {
+                    displayContainer.edidVersionLabel.hide();
+                    displayContainer.edidVersionValue.hide();
+                }
+                if (displayData.edid?.bdp?.maxHorImgSize && displayData.edid?.bdp?.maxVertImgSize) {
+                    const width = displayData.edid.bdp.maxHorImgSize;
+                    const height = displayData.edid.bdp.maxVertImgSize;
+                    const inches = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2)) / 2.54;
+                    displayContainer.displaySizeValue.text = `${inches.toFixed(1)}" - ${width}cm x ${height}cm`;
+                    displayContainer.displaySizeLabel.show();
+                    displayContainer.displaySizeValue.show();
+                }
+                else {
+                    displayContainer.displaySizeLabel.hide();
+                    displayContainer.displaySizeValue.hide();
+                }
+                if (displayData.edid?.dtds &&
+                    displayData.edid?.dtds.length > 0 &&
+                    displayData.edid?.dtds[0].horActivePixels &&
+                    displayData.edid?.dtds[0].vertActivePixels) {
+                    const resolutions = new Set();
+                    for (const dtd of displayData.edid.dtds) {
+                        resolutions.add(dtd.horActivePixels + ' x ' + dtd.vertActivePixels);
+                    }
+                    displayContainer.nativeResolutionValue.text =
+                        Array.from(resolutions).join(', ');
+                    displayContainer.nativeResolutionValue.show();
+                    if (resolutions.size > 1) {
+                        displayContainer.nativeResolutionLabel.text = _('Native Resolutions');
+                    }
+                    else {
+                        displayContainer.nativeResolutionLabel.text = _('Native Resolution');
+                    }
+                    displayContainer.nativeResolutionLabel.show();
+                }
+                else {
+                    displayContainer.nativeResolutionLabel.hide();
+                    displayContainer.nativeResolutionValue.hide();
+                }
+                if (displayData.edid?.standardDisplayModes &&
+                    displayData.edid?.standardDisplayModes.length > 0) {
+                    const refreshRates = new Set();
+                    for (const mode of displayData.edid.standardDisplayModes) {
+                        refreshRates.add(mode.vertFreq);
+                    }
+                    displayContainer.refreshRateValue.text = Array.from(refreshRates).join(', ');
+                    if (refreshRates.size > 1) {
+                        displayContainer.refreshRateLabel.text = _('Refresh Rates');
+                    }
+                    else {
+                        displayContainer.refreshRateLabel.text = _('Refresh Rate');
+                    }
+                    displayContainer.refreshRateLabel.show();
+                    displayContainer.refreshRateValue.show();
+                }
+                else {
+                    displayContainer.refreshRateLabel.hide();
+                    displayContainer.refreshRateValue.hide();
+                }
+                if (displayData.edid?.bdp?.displayGamma) {
+                    displayContainer.displayGammaValue.text =
+                        displayData.edid.bdp.displayGamma.toFixed(1);
+                    displayContainer.displayGammaLabel.show();
+                    displayContainer.displayGammaValue.show();
+                }
+                else {
+                    displayContainer.displayGammaLabel.hide();
+                    displayContainer.displayGammaValue.hide();
+                }
+                if (displayData.edid?.bdp?.displayType) {
+                    displayContainer.displayTypeLabel.show();
+                    displayContainer.displayTypeValue.show();
+                    if (displayData.edid?.bdp?.digitalInput) {
+                        switch (displayData.edid?.bdp?.displayType) {
+                            case 0:
+                                displayContainer.displayTypeValue.text = _('RGB 4:4:4');
+                                break;
+                            case 1:
+                                displayContainer.displayTypeValue.text =
+                                    _('RGB 4:4:4 + YCrCb 4:4:4');
+                                break;
+                            case 2:
+                                displayContainer.displayTypeValue.text =
+                                    _('RGB 4:4:4 + YCrCb 4:2:2');
+                                break;
+                            case 3:
+                                displayContainer.displayTypeValue.text = _('RGB 4:4:4 + YCrCb 4:4:4 + YCrCb 4:2:2');
+                                break;
+                        }
+                    }
+                    else {
+                        switch (displayData.edid.bdp.displayType) {
+                            case 0:
+                                displayContainer.displayTypeValue.text =
+                                    _('Monochrome or Grayscale');
+                                break;
+                            case 1:
+                                displayContainer.displayTypeValue.text = _('RGB color');
+                                break;
+                            case 2:
+                                displayContainer.displayTypeValue.text = _('Non-RGB color');
+                                break;
+                            case 3:
+                                displayContainer.displayTypeLabel.hide();
+                                displayContainer.displayTypeValue.hide();
+                                break;
+                        }
+                    }
+                }
+                else {
+                    displayContainer.displayTypeLabel.hide();
+                    displayContainer.displayTypeValue.hide();
+                }
+                const capabilities = [];
+                if (displayData.edid?.bdp?.digitalInput) {
+                    capabilities.push(_('Digital Input'));
+                    if (displayData.edid?.bdp?.vesaDfpCompatible) {
+                        capabilities.push(_('VESA DFP'));
+                    }
+                }
+                else {
+                    if (displayData.edid?.bdp?.whiteSyncLevels) {
+                        capabilities.push(_('White Sync Levels: ' + displayData.edid?.bdp?.whiteSyncLevels));
+                    }
+                    if (displayData.edid?.bdp?.blankToBlack) {
+                        capabilities.push(_('Blank to Black'));
+                    }
+                    if (displayData.edid?.bdp?.separateSyncSupported) {
+                        capabilities.push(_('Separate Sync'));
+                    }
+                    if (displayData.edid?.bdp?.compositeSyncSupported) {
+                        capabilities.push(_('Composite Sync'));
+                    }
+                    if (displayData.edid?.bdp?.synOnGreen) {
+                        capabilities.push(_('Sync on Green'));
+                    }
+                    if (displayData.edid?.bdp?.vsyncSerrated) {
+                        capabilities.push(_('VSync Serrated'));
+                    }
+                }
+                if (displayData.edid?.bdp?.dpmsStandby) {
+                    capabilities.push(_('DPMS Standby'));
+                }
+                if (displayData.edid?.bdp?.dpmsSuspend) {
+                    capabilities.push(_('DPMS Suspend'));
+                }
+                if (displayData.edid?.bdp?.dpmsActiveOff) {
+                    capabilities.push(_('DPMS Active Off'));
+                }
+                if (displayData.edid?.bdp?.standardSRgb) {
+                    capabilities.push(_('Standard sRGB'));
+                }
+                if (displayData.edid?.bdp?.preferredTiming) {
+                    capabilities.push(_('Preferred Timing'));
+                }
+                if (displayData.edid?.bdp?.gtfSupported) {
+                    capabilities.push(_('GTF Supported'));
+                }
+                if (capabilities.length > 0) {
+                    displayContainer.capabilitiesLabel.show();
+                    displayContainer.capabilitiesValue.show();
+                    displayContainer.capabilitiesValue.text = capabilities.join(', ');
+                }
+                else {
+                    displayContainer.capabilitiesLabel.hide();
+                    displayContainer.capabilitiesValue.hide();
+                }
             }
         };
         return popup;
@@ -896,127 +1414,147 @@ export default class GpuMenuComponent {
             this.lastData = data;
             return;
         }
-        const selectedGpu = Utils.gpuMonitor.getSelectedGpu();
-        if (!selectedGpu)
-            return;
-        const selectedPci = `${selectedGpu.domain}:${selectedGpu.bus}.${selectedGpu.slot}`;
-        const gpuData = data.get(selectedPci);
-        if (!gpuData)
-            return;
-        const compareGpu = (section) => {
-            return (section.info.domain === selectedGpu.domain &&
-                section.info.bus === selectedGpu.bus &&
-                section.info.slot === selectedGpu.slot);
-        };
-        const section = this.sections.find(compareGpu);
-        if (!section)
-            return;
-        if (section.vram.bar &&
-            gpuData.vram.percent !== undefined &&
-            !Number.isNaN(gpuData.vram.percent)) {
-            section.vram.bar.setUsage([{ percent: gpuData.vram.percent }]);
-            if (section.vram.barLabel)
-                section.vram.barLabel.text = gpuData.vram.percent.toFixed(0) + '%';
-        }
-        if (section.vram.usedLabel &&
-            gpuData.vram.used !== undefined &&
-            !Number.isNaN(gpuData.vram.used)) {
-            section.vram.usedLabel.text = Utils.formatBytes(gpuData.vram.used, 'kB-KB', 3);
-        }
-        if (section.vram.totalLabel &&
-            gpuData.vram.total !== undefined &&
-            !Number.isNaN(gpuData.vram.total)) {
-            section.vram.totalLabel.text = Utils.formatBytes(gpuData.vram.total, 'kB-KB', 3);
-        }
-        if (section.activity.gfxBar &&
-            gpuData.activity.GFX !== undefined &&
-            !Number.isNaN(gpuData.activity.GFX)) {
-            section.activity.gfxBar.setUsage([{ percent: gpuData.activity.GFX }]);
-            if (section.activity.gfxBarLabel)
-                section.activity.gfxBarLabel.text = gpuData.activity.GFX.toFixed(0) + '%';
-        }
-        if (this.topProcesses) {
-            const numProcesses = this.compact ? 3 : 5;
-            for (let index = 0; index < numProcesses; index++) {
-                const topProcess = this.topProcesses[index];
-                if (!topProcess)
-                    continue;
-                const topProcessData = gpuData.topProcesses[index];
-                if (!topProcessData) {
-                    topProcess.label.text = '-';
-                    topProcess.value1.text = '-';
-                    topProcess.value2.text = '-';
-                    if (gpuData.family === 'NVIDIA') {
+        for (const section of this.sections) {
+            const gpuData = data.get(section.uuid);
+            if (!gpuData) {
+                continue;
+            }
+            if (section.vram.bar &&
+                gpuData.vram.percent !== undefined &&
+                !Number.isNaN(gpuData.vram.percent)) {
+                section.vram.bar.setUsage([{ percent: gpuData.vram.percent }]);
+                if (section.vram.barLabel)
+                    section.vram.barLabel.text = gpuData.vram.percent.toFixed(0) + '%';
+            }
+            if (section.vram.usedLabel &&
+                gpuData.vram.used !== undefined &&
+                !Number.isNaN(gpuData.vram.used)) {
+                section.vram.usedLabel.text = Utils.formatBytes(gpuData.vram.used, 'kB-KB', 3);
+            }
+            if (section.vram.totalLabel &&
+                gpuData.vram.total !== undefined &&
+                !Number.isNaN(gpuData.vram.total)) {
+                section.vram.totalLabel.text = Utils.formatBytes(gpuData.vram.total, 'kB-KB', 3);
+            }
+            if (section.activity.gfxBar &&
+                gpuData.activity.GFX !== undefined &&
+                !Number.isNaN(gpuData.activity.GFX)) {
+                section.activity.gfxBar.setUsage([{ percent: gpuData.activity.GFX }]);
+                if (section.activity.gfxBarLabel)
+                    section.activity.gfxBarLabel.text = gpuData.activity.GFX.toFixed(0) + '%';
+            }
+            if (this.topProcesses) {
+                const numProcesses = this.compact ? 3 : 5;
+                for (let index = 0; index < numProcesses; index++) {
+                    const topProcess = this.topProcesses.get(section.uuid)?.[index];
+                    if (!topProcess)
+                        continue;
+                    const topProcessData = gpuData.topProcesses[index];
+                    if (!topProcessData) {
+                        topProcess.label.text = '-';
+                        topProcess.value1.text = '-';
+                        topProcess.value2.text = '-';
+                        if (gpuData.family === 'NVIDIA') {
+                            topProcess.value2.hide();
+                        }
+                        continue;
+                    }
+                    topProcess.label.text = topProcessData.name;
+                    const pipe0 = topProcessData.pipes[0];
+                    if (!pipe0) {
+                        topProcess.value1.text = '-';
+                    }
+                    else {
+                        if (pipe0.unit === '%')
+                            topProcess.value1.text = pipe0.value.toFixed(0) + '%';
+                        else
+                            topProcess.value1.text = Utils.formatBytes(pipe0.value, 'kB-KB', 3);
+                    }
+                    const pipe1 = topProcessData.pipes[1];
+                    if (!pipe1) {
                         topProcess.value2.hide();
                     }
-                    continue;
-                }
-                topProcess.label.text = topProcessData.name;
-                const pipe0 = topProcessData.pipes[0];
-                if (!pipe0) {
-                    topProcess.value1.text = '-';
-                }
-                else {
-                    if (pipe0.unit === '%')
-                        topProcess.value1.text = pipe0.value.toFixed(0) + '%';
-                    else
-                        topProcess.value1.text = Utils.formatBytes(pipe0.value, 'kB-KB', 3);
-                }
-                const pipe1 = topProcessData.pipes[1];
-                if (!pipe1) {
-                    topProcess.value2.hide();
-                }
-                else {
-                    topProcess.value2.show();
-                    if (pipe1.unit === '%')
-                        topProcess.value2.text = pipe1.value.toFixed(0) + '%';
-                    else
-                        topProcess.value2.text = Utils.formatBytes(pipe1.value, 'kB-KB', 3);
+                    else {
+                        topProcess.value2.show();
+                        if (pipe1.unit === '%')
+                            topProcess.value2.text = pipe1.value.toFixed(0) + '%';
+                        else
+                            topProcess.value2.text = Utils.formatBytes(pipe1.value, 'kB-KB', 3);
+                    }
                 }
             }
-        }
-        if (this.mainSensors) {
-            const numSensors = this.compact ? 1 : 3;
-            for (let index = 0; index < numSensors; index++) {
-                const sensor = this.mainSensors[index];
-                if (!sensor)
-                    continue;
-                sensor.label.text = '-';
-                sensor.value.text = '-';
-                if (!gpuData.sensors.list)
-                    continue;
-                const sensorData = gpuData.sensors.list[index];
-                if (!sensorData)
-                    continue;
-                sensor.label.text = sensorData.name;
-                let unit = sensorData.unit;
-                if (unit === 'C')
-                    unit = '°C';
-                let value = sensorData.value;
-                if (unit === '°C' &&
-                    typeof value === 'number' &&
-                    Config.get_string('sensors-temperature-unit') === 'fahrenheit') {
-                    value = Utils.celsiusToFahrenheit(value);
-                    unit = '°F';
+            if (this.mainSensors) {
+                const numSensors = this.compact ? 1 : 3;
+                for (let index = 0; index < numSensors; index++) {
+                    const sensor = this.mainSensors.get(section.uuid)?.[index];
+                    if (!sensor)
+                        continue;
+                    sensor.label.text = '-';
+                    sensor.value.text = '-';
+                    if (!gpuData.sensors.list)
+                        continue;
+                    const sensorData = gpuData.sensors.list[index];
+                    if (!sensorData)
+                        continue;
+                    sensor.label.text = sensorData.name;
+                    let unit = sensorData.unit;
+                    if (unit === 'C')
+                        unit = '°C';
+                    let value = sensorData.value;
+                    if (unit === '°C' &&
+                        typeof value === 'number' &&
+                        Config.get_string('sensors-temperature-unit') === 'fahrenheit') {
+                        value = Utils.celsiusToFahrenheit(value);
+                        unit = '°F';
+                    }
+                    unit = unit === '' ? '' : ' ' + unit;
+                    sensor.value.text = value + unit;
                 }
-                unit = unit === '' ? '' : ' ' + unit;
-                sensor.value.text = value + unit;
+            }
+            if (section.infoPopup)
+                section.infoPopup.updateData(gpuData);
+            if (section.activityPopup)
+                section.activityPopup.updateData(gpuData);
+            if (section.vramPopup)
+                section.vramPopup.updateData(gpuData);
+            if (section.topProcessesPopup)
+                section.topProcessesPopup.updateData(gpuData);
+            if (section.sensorsPopup)
+                section.sensorsPopup.updateData(gpuData);
+        }
+    }
+    updateDisplays() {
+        let displaysData = Utils.gpuMonitor.getCurrentValue('displays');
+        displaysData = displaysData.filter(d => !d.connector.toLowerCase().includes('writeback'));
+        if (!displaysData || displaysData.length === 0) {
+            return;
+        }
+        for (const section of this.sections) {
+            let connected = 0;
+            let total = 0;
+            const displays = [];
+            for (const displayData of displaysData) {
+                if (section.uuid === displayData.uuid) {
+                    if (displayData.status === 'connected') {
+                        connected++;
+                    }
+                    total++;
+                }
+                displays.push(displayData);
+            }
+            if (section.displaysTitle) {
+                section.displaysTitle.text = _('%d/%d Displays Connected').format(connected, total);
+            }
+            if (section.displaysPopup) {
+                section.displaysPopup.updateData(displays);
             }
         }
-        if (section.infoPopup)
-            section.infoPopup.updateData(gpuData);
-        if (section.activityPopup)
-            section.activityPopup.updateData(gpuData);
-        if (section.vramPopup)
-            section.vramPopup.updateData(gpuData);
-        if (section.topProcessesPopup)
-            section.topProcessesPopup.updateData(gpuData);
-        if (section.sensorsPopup)
-            section.sensorsPopup.updateData(gpuData);
     }
     onOpen() {
         this.clear();
         this.shown = true;
+        Utils.gpuMonitor.requestUpdate('displays');
+        Utils.gpuMonitor.listen(this, 'displays', this.updateDisplays.bind(this));
         try {
             this.update(this.lastData);
         }
@@ -1026,6 +1564,7 @@ export default class GpuMenuComponent {
     }
     onClose() {
         this.shown = false;
+        Utils.gpuMonitor.unlisten(this, 'displays');
     }
     clear() { }
     destroy() {

@@ -292,7 +292,7 @@ export default class ProcessorMenu extends MenuBase {
         this.processorBar = new ProcessorBars({
             numBars: 1,
             width: 200 - 2,
-            height: 1,
+            height: 0.8,
             mini: false,
             layout: 'horizontal',
             xAlign: Clutter.ActorAlign.START,

@@ -166,25 +166,13 @@ export default GObject.registerClass(class ProcessorHeader extends Header {
         const perCoreBars = Config.get_boolean('processor-header-bars-core');
         if (perCoreBars)
             numBars = Utils.processorMonitor.getNumberOfCores();
-
         this.bars = new ProcessorBars({
             numBars: numBars,
             header: true,
-            layout: 'horizontal',
             mini: true,
-            width: 300,
-            height: 0.8,
+            width: 0.5,
             breakdownConfig: 'processor-header-bars-breakdown',
         });
-
-        // this.bars = new ProcessorBars({
-        //     numBars: numBars,
-        //     header: true,
-        //     mini: true,
-        //     width: 0.5,
-        //     breakdownConfig: 'processor-header-bars-breakdown',
-        // });
-    
         Config.bind('processor-header-bars', this.bars, 'visible', Gio.SettingsBindFlags.GET);
         if (perCoreBars) {
             Utils.processorMonitor.listen(this.bars, 'cpuCoresUsage', this.updateBarsCores.bind(this));
@@ -328,10 +316,10 @@ export default GObject.registerClass(class ProcessorHeader extends Header {
         const figures = Config.get_int('processor-header-frequency-figures');
         if (this.frequencyMode === 'average') {
             const sum = frequency.reduce((a, b) => a + b, 0);
-            this.frequency.text = Utils.formatFrequency(sum / frequency.length / 1000, 'MHz', figures, true);
+            this.frequency.text = Utils.formatFrequency(sum / frequency.length / 1000, 'GHz', figures, true);
         }
         else if (this.frequencyMode === 'max') {
-            this.frequency.text = Utils.formatFrequency(Math.max(...frequency) / 1000, 'MHz', figures, true);
+            this.frequency.text = Utils.formatFrequency(Math.max(...frequency) / 1000, 'GHz', figures, true);
         }
     }
     update() {

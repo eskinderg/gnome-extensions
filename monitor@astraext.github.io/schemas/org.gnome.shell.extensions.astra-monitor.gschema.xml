@@ -86,7 +86,7 @@
   <schema id="org.gnome.shell.extensions.astra-monitor" path="/org/gnome/shell/extensions/astra-monitor/">
     <!-- UTILS -->
     <key name="debug-mode" type="b">
-      <default>true</default>
+      <default>false</default>
       <summary>Debug</summary>
       <description>Enable debug mode</description>
     </key>
@@ -342,36 +342,6 @@
       <summary>Bars Color 2</summary>
       <description>Secondary color for processor realtime bars</description>
     </key>
-    <key name="processor-header-bars-color3" type="s">
-      <default>'rgba(29,172,214,1.0)'</default>
-      <summary>Bars Color 3</summary>
-      <description>Secondary color for processor realtime bars</description>
-    </key>
-    <key name="processor-header-bars-color4" type="s">
-      <default>'rgba(72,179,52,1.0)'</default>
-      <summary>Bars Color 4</summary>
-      <description>Secondary color for processor realtime bars</description>
-    </key>
-    <key name="processor-header-bars-color5" type="s">
-      <default>'rgba(250,183,51,1.0)'</default>
-      <summary>Bars Color 5</summary>
-      <description>Secondary color for processor realtime bars</description>
-    </key>
-    <key name="processor-header-bars-color6" type="s">
-      <default>'rgba(255,142,21,1.0)'</default>
-      <summary>Bars Color 6</summary>
-      <description>Secondary color for processor realtime bars</description>
-    </key>
-    <key name="processor-header-bars-color7" type="s">
-      <default>'rgba(255,78,17,1.0)'</default>
-      <summary>Bars Color 7</summary>
-      <description>Secondary color for processor realtime bars</description>
-    </key>
-    <key name="processor-header-bars-color8" type="s">
-      <default>'rgba(255,13,13,1.0)'</default>
-      <summary>Bars Color 8</summary>
-      <description>Secondary color for processor realtime bars</description>
-    </key>
     <key name="processor-header-bars-breakdown" type="b">
       <default>true</default>
       <summary>CPU Bars Breakdown</summary>
@@ -427,7 +397,7 @@
       <description>Show the GPU header</description>
     </key>
     <key name="gpu-update" type="d">
-      <default>1.5</default>
+      <default>2.0</default>
       <summary>GPU Update Frequency</summary>
       <description>Seconds between GPU statistics updates</description>
       <range min="1.0" max="10"/>
@@ -436,6 +406,11 @@
       <default>'""'</default>
       <summary>Main GPU</summary>
       <description>Main GPU</description>
+    </key>
+    <key name="gpu-data" type="s">
+      <default>'""'</default>
+      <summary>GPU Data</summary>
+      <description>GPU Data</description>
     </key>
     <key name="gpu-indicators-order" type="s">
       <default>'""'</default>
@@ -705,11 +680,6 @@
       <default>'rgba(29,172,214,0.3)'</default>
       <summary>Bars Color 2</summary>
       <description>Secondary color for memory realtime bars</description>
-    </key>
-    <key name="memory-header-bars-color3" type="s">
-      <default>'rgba(214,29,29,1.0)'</default>
-      <summary>Bars Color 3</summary>
-      <description>red color for memory bars</description>
     </key>
     <key name="memory-header-bars-breakdown" type="b">
       <default>true</default>
@@ -1334,7 +1304,7 @@
     </key>
     
     <!-- DEPRECATED KEYS
-    VALUES ARE MOVED TO PROPER NEW KEYS AS SOON AS FIRST RUN (V20)
+    VALUES ARE MOVED TO PROPER NEW KEYS AS SOON AS FIRST RUN
     KEEP THEM FOR BACKWARD COMPATIBILITY
     -->
     <key name="processor-menu-gpu" type="s">

@@ -435,5 +435,6 @@ Config.globalSettingsKeys = [
     'processor-menu-gpu',
     'processor-menu-gpu-color',
     'headers-height',
+    'gpu-main',
 ];
 export default Config;
