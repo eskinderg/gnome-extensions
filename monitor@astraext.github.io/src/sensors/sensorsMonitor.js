@@ -22,7 +22,6 @@ import Utils from '../utils/utils.js';
 import Monitor from '../monitor.js';
 import CancellableTaskManager from '../utils/cancellableTaskManager.js';
 import PromiseValueHolder, { PromiseValueHolderStore } from '../utils/promiseValueHolder.js';
-import CommandHelper from '../utils/commandHelper.js';
 export default class SensorsMonitor extends Monitor {
     constructor() {
         super('Sensors Monitor');
@@ -186,7 +185,7 @@ export default class SensorsMonitor extends Monitor {
             }
             try {
                 const path = Utils.commandPathLookup('sensors -v');
-                CommandHelper.runCommand(`${path}sensors -j`, this.updateSensorsDataTask)
+                Utils.runAsyncCommand(`${path}sensors -j`, this.updateSensorsDataTask)
                     .then(result => {
                     resolve(result);
                 })

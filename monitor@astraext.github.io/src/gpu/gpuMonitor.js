@@ -23,7 +23,6 @@ import Utils from '../utils/utils.js';
 import Monitor from '../monitor.js';
 import ContinuousTaskManager from '../utils/continuousTaskManager.js';
 import CancellableTaskManager from '../utils/cancellableTaskManager.js';
-import CommandHelper from '../utils/commandHelper.js';
 import { EdidParser } from '../utils/edidParser.js';
 var GpuSensorPriority;
 (function (GpuSensorPriority) {
@@ -1422,7 +1421,7 @@ export default class GpuMonitor extends Monitor {
         const cards = [];
         for (const card of cardsList) {
             if (card.isFolder && /^card[0-9]+$/.test(card.name)) {
-                const promise = CommandHelper.runCommand(`readlink -f /sys/class/drm/${card.name}/device`);
+                const promise = Utils.runAsyncCommand(`readlink -f /sys/class/drm/${card.name}/device`);
                 cards.push({ name: card.name, pathPromise: promise });
             }
         }

@@ -49,7 +49,7 @@ export default class Utility {
             title: _('Utility'),
             iconName: 'am-settings-symbolic',
         });
-        const group = new Adw.PreferencesGroup({ title: _('Utility') });
+        let group = new Adw.PreferencesGroup({ title: _('Utility') });
         PrefsUtils.addButtonRow({
             title: _('Export Settings'),
             subtitle: _('Warning: this will export all profiles.'),
@@ -148,6 +148,32 @@ export default class Utility {
             title: _('Debug Mode'),
             subtitle: _('Warning: may affect performance, use only if you know what you are doing.'),
         }, 'debug-mode', group);
+        utilityPage.add(group);
+        group = new Adw.PreferencesGroup({ title: _('Experimental Features') });
+        PrefsUtils.addSwitchRow({
+            title: _('PosixSpawn Subprocess'),
+            subtitle: _('Experimental posix_spawn() subprocess monitoring.'),
+        }, {
+            watch: 'experimental-features',
+            get: () => {
+                const features = Config.get_json('experimental-features');
+                return features?.includes('ps_subprocess') ?? false;
+            },
+            set: (value) => {
+                const features = Config.get_json('experimental-features');
+                if (value) {
+                    if (!features?.includes('ps_subprocess')) {
+                        features.push('ps_subprocess');
+                    }
+                }
+                else {
+                    if (features?.includes('ps_subprocess')) {
+                        features.splice(features.indexOf('ps_subprocess'), 1);
+                    }
+                }
+                Config.set('experimental-features', features, 'json');
+            },
+        }, group);
         utilityPage.add(group);
         return utilityPage;
     }

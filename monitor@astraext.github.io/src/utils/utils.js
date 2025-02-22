@@ -20,6 +20,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Config from '../config.js';
+import CommandSubprocess from './commandSubprocess.js';
 import CommandHelper from './commandHelper.js';
 import XMLParser from './xmlParser.js';
 class Utils {
@@ -1201,7 +1202,7 @@ class Utils {
             return disks;
         try {
             const path = Utils.commandPathLookup('lsblk -V');
-            const result = await CommandHelper.runCommand(`${path}lsblk -J -o ID,NAME,LABEL,MOUNTPOINTS,PATH`, task);
+            const result = await Utils.runAsyncCommand(`${path}lsblk -J -o ID,NAME,LABEL,MOUNTPOINTS,PATH`, task);
             if (result) {
                 const parsedData = JSON.parse(result);
                 const findDevice = (device) => {
@@ -1529,6 +1530,20 @@ class Utils {
             });
         });
     }
+    static runAsyncCommand(command, task) {
+        if (Utils.experimentalPsSubprocess === undefined) {
+            let features = Config.get_json('experimental-features');
+            Utils.experimentalPsSubprocess = features?.includes('ps_subprocess') ?? false;
+            Config.connect(this, 'changed::experimental-features', () => {
+                features = Config.get_json('experimental-features');
+                Utils.experimentalPsSubprocess = features?.includes('ps_subprocess') ?? false;
+            });
+        }
+        if (Utils.experimentalPsSubprocess) {
+            return CommandSubprocess.run(command, task);
+        }
+        return CommandHelper.runCommand(command, task);
+    }
     static getLocalIcon(iconName) {
         if (!Utils.metadata || !Utils.metadata.path)
             return undefined;
@@ -1616,7 +1631,7 @@ class Utils {
             return devices;
         try {
             const path = Utils.commandPathLookup('ip -V');
-            const result = await CommandHelper.runCommand(`${path}ip -d -j addr`, task);
+            const result = await Utils.runAsyncCommand(`${path}ip -d -j addr`, task);
             if (result) {
                 const json = JSON.parse(result);
                 for (const data of json) {
@@ -1696,7 +1711,7 @@ class Utils {
             return routes;
         try {
             const path = Utils.commandPathLookup('ip -V');
-            const result = await CommandHelper.runCommand(`${path}ip -d -j route show default`, task);
+            const result = await Utils.runAsyncCommand(`${path}ip -d -j route show default`, task);
             if (result) {
                 const json = JSON.parse(result);
                 for (const data of json) {
@@ -1750,7 +1765,7 @@ class Utils {
             return devices;
         try {
             const commandPath = Utils.commandPathLookup('lsblk -V');
-            const result = await CommandHelper.runCommand(`${commandPath}lsblk -Jb -o ID,UUID,NAME,KNAME,PKNAME,LABEL,TYPE,SUBSYSTEMS,MOUNTPOINTS,VENDOR,MODEL,PATH,RM,RO,STATE,OWNER,SIZE,FSUSE%,FSTYPE`, task);
+            const result = await Utils.runAsyncCommand(`${commandPath}lsblk -Jb -o ID,UUID,NAME,KNAME,PKNAME,LABEL,TYPE,SUBSYSTEMS,MOUNTPOINTS,VENDOR,MODEL,PATH,RM,RO,STATE,OWNER,SIZE,FSUSE%,FSTYPE`, task);
             if (result) {
                 const json = JSON.parse(result);
                 for (const device of json.blockdevices) {
@@ -2032,6 +2047,13 @@ class Utils {
                 Config.set('gpu-data', gpuData, 'json');
             }
         }
+        let experimentalFeatures = Config.get_json('experimental-features');
+        if (!experimentalFeatures) {
+            Config.set('experimental-features', [], 'json');
+            experimentalFeatures = [];
+        }
+        experimentalFeatures = experimentalFeatures.filter((feature) => Config.experimentalFeatures.includes(feature));
+        Config.set('experimental-features', experimentalFeatures, 'json');
     }
     static unitToIcon(unit) {
         const icon = {
@@ -2207,6 +2229,7 @@ Utils.unit4Map = {
 Utils.sensorsPrefix = ['temp', 'fan', 'in', 'power', 'curr', 'energy', 'pwm', 'freq'];
 Utils.cachedUptimeSeconds = 0;
 Utils.uptimeTimer = 0;
+Utils.experimentalPsSubprocess = undefined;
 Utils.lowPriorityTasks = [];
 Utils.timeoutTasks = [];
 Utils.nethogsCaps = undefined;

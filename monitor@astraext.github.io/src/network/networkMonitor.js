@@ -24,7 +24,6 @@ import Monitor from '../monitor.js';
 import CancellableTaskManager from '../utils/cancellableTaskManager.js';
 import PromiseValueHolder, { PromiseValueHolderStore } from '../utils/promiseValueHolder.js';
 import ContinuousTaskManager from '../utils/continuousTaskManager.js';
-import CommandHelper from '../utils/commandHelper.js';
 export default class NetworkMonitor extends Monitor {
     static get TOP_PROCESSES_LIMIT() {
         return 10;
@@ -552,7 +551,7 @@ export default class NetworkMonitor extends Monitor {
         const path = Utils.commandPathLookup('iwconfig --version');
         let result = '';
         try {
-            result = await CommandHelper.runCommand(`${path}iwconfig`);
+            result = await Utils.runAsyncCommand(`${path}iwconfig`);
         }
         catch (e) {
         }
@@ -616,7 +615,7 @@ export default class NetworkMonitor extends Monitor {
             devicePromises.push((async () => {
                 try {
                     const path = Utils.commandPathLookup('iw --version');
-                    const str = await CommandHelper.runCommand(`${path}iw dev ${dev} link`);
+                    const str = await Utils.runAsyncCommand(`${path}iw dev ${dev} link`);
                     if (!str)
                         return;
                     const data = { name: dev };

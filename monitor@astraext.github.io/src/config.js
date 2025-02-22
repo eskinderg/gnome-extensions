@@ -436,5 +436,7 @@ Config.globalSettingsKeys = [
     'processor-menu-gpu-color',
     'headers-height',
     'gpu-main',
+    'experimental-features',
 ];
+Config.experimentalFeatures = ['ps_subprocess'];
 export default Config;

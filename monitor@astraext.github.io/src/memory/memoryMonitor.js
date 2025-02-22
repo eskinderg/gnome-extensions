@@ -23,7 +23,6 @@ import Monitor from '../monitor.js';
 import TopProcessesCache from '../utils/topProcessesCache.js';
 import CancellableTaskManager from '../utils/cancellableTaskManager.js';
 import PromiseValueHolder, { PromiseValueHolderStore } from '../utils/promiseValueHolder.js';
-import CommandHelper from '../utils/commandHelper.js';
 export default class MemoryMonitor extends Monitor {
     static get TOP_PROCESSES_LIMIT() {
         return 15;
@@ -272,7 +271,7 @@ export default class MemoryMonitor extends Monitor {
         const seenPids = [];
         const processPromises = [];
         try {
-            const result = await CommandHelper.runCommand('ps -eo pid,rss,%mem --sort=-%mem', this.updateTopProcessesTask);
+            const result = await Utils.runAsyncCommand('ps -eo pid,rss,%mem --sort=-%mem', this.updateTopProcessesTask);
             if (result) {
                 let lines = result.split('\n');
                 lines.shift();
