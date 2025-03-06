@@ -72,10 +72,18 @@ class WorldClockMultiButton extends PanelMenu.Button {
     this._lbt = lbt
 
     let nameMap = this._extn._mySettings.get_value('name-map').deep_unpack()
+    let name
     if (nameMap[lbt.code])
-      this._place.set_text(nameMap[lbt.code])
+      name = nameMap[lbt.code]
     else
-      this._place.set_text(lbt.displayName)
+      name = lbt.displayName
+    if (this._extn._mySettings.get_boolean('show-city')) {
+      const sfx = name.match(/ \((\w+)\)$/)
+      const tz = lbt.now().format("%Z")
+      if (!sfx && name != tz)
+        name += ` (${tz})`
+    }
+    this._place.set_text(name)
     this.make_loc_menu()
     this.refresh()
   }
@@ -193,6 +201,7 @@ class LocationBasedTime {
 
     this.displayName = loc.get_city_name() || city.get_name()
     this.displayName2 = loc.get_name()
+    this.displayName4 = this.displayName2
 
     const country_name = loc.get_country_name()
     if (country_name)
@@ -202,6 +211,8 @@ class LocationBasedTime {
     if (country_code)
       this.displayName2 = (this.displayName2 ? this.displayName2 + " (" + country_code + ")" :
                            country_code)
+
+    this.displayName4 = this.displayName4 || country_name || country_code
 
     if (!this.displayName)
       this.displayName = loc.get_name()
@@ -230,6 +241,8 @@ class LocationBasedTime {
       this.displayName3 = nameMap[this.code] + (country_code ? " (" + country_code + ")" : "")
     else
       this.displayName3 = this.displayName2
+    if (nameMap[this.code])
+      this.displayName4 = nameMap[this.code]
   }
 
   now () {
@@ -249,7 +262,7 @@ class LocationBasedTime {
                                  "%a " : "") + this._extn.get12hTimeFormat(now))
     if (this._extn._mySettings.get_boolean('show-city')) {
       const sfx = this.displayName3.match(/ \((\w+)\)$/)
-      return now.format(format_string) + " " + (this._loc.has_coords() || !sfx ? this.displayName3 : sfx[1])
+      return now.format(format_string) + " " + (this._loc.has_coords() || !sfx ? this.displayName4 : sfx[1])
     } else {
       return now.format(format_string + " %Z")
     }

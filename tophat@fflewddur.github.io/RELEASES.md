@@ -3,6 +3,16 @@
 All notable changes to [TopHat] are listed in this file. The format is loosely
 based on [Keep a Changelog].
 
+## TopHat 21 - February 23, 2025
+
+- Added support for GNOME 48
+- Added a tooltip to display long command names
+- Added option to group top processes by command
+- Added option to disable sorting CPU meter by usage (from [SoMuchForSubtlety](https://github.com/SoMuchForSubtlety))
+- Improved process identification
+- Fixed CPU usage calculation for nice'd processes
+- Fixed center-aligned labels in the top bar
+
 ## TopHat 20 - January 28, 2025
 
 - Added capacity visualizations to the memory and disk monitor menus

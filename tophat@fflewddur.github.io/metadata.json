@@ -7,9 +7,10 @@
   "shell-version": [
     "45",
     "46",
-    "47"
+    "47",
+    "48"
   ],
   "url": "https://github.com/fflewddur/tophat",
   "uuid": "tophat@fflewddur.github.io",
-  "version": 20
+  "version": 21
 }

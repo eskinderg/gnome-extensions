@@ -50,6 +50,9 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
                 b.set_width(this.barWidth);
             }
         });
+        // themeContext.connect('changed', (source: St.ThemeContext) => {
+        //   console.log('themeContext changed');
+        // });
         this.connect('notify::height', () => {
             this.setBarSizes(this.barUsage);
         });
@@ -69,12 +72,12 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
             this.bars[i] = new St.Widget({
                 y_align: Clutter.ActorAlign.END,
                 y_expand: false,
-                style_class: 'meter-bar',
                 width: this.barWidth,
                 height: 1 * this.scaleFactor,
-                background_color: this.color,
+                style_class: 'meter-bar',
                 name: 'TopHatMeterBar',
             });
+            setBarColor(this.bars[i], this.color);
             this.add_child(this.bars[i]);
             this.barUsage[i] = 0;
         }
@@ -156,7 +159,7 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
         }
         this.color = color;
         for (const bar of this.bars) {
-            bar.set_background_color(this.color);
+            setBarColor(bar, this.color);
         }
     }
     reorient() {
@@ -171,14 +174,8 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
             b.set_width(this.barWidth);
         }
         for (let i = 0; i < this.bars.length; i++) {
-            let style = '';
-            if (i === this.bars.length - 1) {
-                style += 'margin:0;';
-            }
-            else {
-                style += 'margin:0 1px 0 0;';
-            }
-            this.bars[i].set_style(style);
+            this.bars[i].remove_style_class_name('meter-bar');
+            this.bars[i].set_style_class_name('meter-bar');
         }
     }
     destroy() {
@@ -189,3 +186,9 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
         super.destroy();
     }
 });
+function setBarColor(bar, color) {
+    let style = bar.get_style() || '';
+    style = style.replaceAll(/background-color:[^;]*;\s*/g, '');
+    style += `background-color: rgb(${color.red}, ${color.green}, ${color.blue});`;
+    bar.set_style(style);
+}

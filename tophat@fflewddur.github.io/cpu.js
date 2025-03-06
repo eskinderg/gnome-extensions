@@ -30,6 +30,7 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
     menuUptime;
     topProcs;
     showCores;
+    sortCores;
     normalizeProcUsage;
     displayType;
     constructor(metadata, gsettings) {
@@ -63,6 +64,10 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
             if (!this.showCores) {
                 this.meter.setNumBars(1);
             }
+        });
+        this.sortCores = this.gsettings.get_boolean('cpu-sort-cores');
+        this.gsettings.connect('changed::cpu-sort-cores', (settings) => {
+            this.sortCores = settings.get_boolean('cpu-sort-cores');
         });
         this.normalizeProcUsage = this.gsettings.get_boolean('cpu-normalize-proc-use');
         this.gsettings.connect('changed::cpu-normalize-proc-use', (settings) => {
@@ -142,6 +147,7 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
         for (let i = 0; i < NumTopProcs; i++) {
             this.topProcs[i].cmd.set_style_class_name('menu-cmd-name');
             this.addMenuRow(this.topProcs[i].cmd, 0, 1, 1);
+            this.topProcs[i].setTooltip();
             this.topProcs[i].usage.set_style_class_name('menu-cmd-usage');
             if (i === NumTopProcs - 1) {
                 this.topProcs[i].usage.add_style_class_name('menu-section-end');
@@ -170,7 +176,11 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
                 if (this.meter.getNumBars() === 1) {
                     this.meter.setNumBars(vitals.getCpuCoreUsage().length);
                 }
-                this.meter.setBarSizes(vitals.getCpuCoreUsage().sort((a, b) => b - a));
+                let usage = vitals.getCpuCoreUsage();
+                if (this.sortCores) {
+                    usage = usage.sort((a, b) => b - a);
+                }
+                this.meter.setBarSizes(usage);
             }
             else {
                 if (this.meter.getNumBars() !== 1) {
@@ -213,10 +223,13 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
                     else {
                         this.topProcs[i].usage.text = '< 1%';
                     }
-                    this.topProcs[i].cmd.text = procs[i].cmd;
+                    this.topProcs[i].setCmd(procs[i].cmd);
+                    if (procs[i].count > 1) {
+                        this.topProcs[i].setCmd(this.topProcs[i].cmd.text + ` (x${procs[i].count})`);
+                    }
                 }
                 else {
-                    this.topProcs[i].cmd.text = '';
+                    this.topProcs[i].setCmd('');
                     this.topProcs[i].usage.text = '';
                 }
             }

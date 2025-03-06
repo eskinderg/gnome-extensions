@@ -3,14 +3,14 @@
   <requires lib="gtk" version="4.0"/>
   <requires lib="libadwaita" version="1.4"/>
   <object class="GtkAdjustment" id="num-adj">
-    <property name="upper">100</property>
+    <property name="upper">24</property>
     <property name="step_increment">1</property>
-    <property name="page_increment">10</property>
+    <property name="page_increment">1</property>
   </object>
   <object class="GtkAdjustment" id="num-adj2">
-    <property name="upper">100</property>
+    <property name="upper">24</property>
     <property name="step_increment">1</property>
-    <property name="page_increment">10</property>
+    <property name="page_increment">1</property>
   </object>
   <object class="AdwPreferencesPage" id="content-table">
     <child>

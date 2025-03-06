@@ -4,6 +4,7 @@
   "uuid": "pcmonitor@eskinderget@gmail.com",
   "settings-schema": "org.gnome.shell.extensions.pc-monitor",
   "shell-version": [
-    "47"
+    "47",
+    "48"
   ]
 }

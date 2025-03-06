@@ -78,6 +78,8 @@ export default class TopHatPrefs extends ExtensionPreferences {
         this.addActionRow(_('Show icons beside monitors'), 'show-icons', group);
         // Show action buttons in menus
         this.addActionRow(_('Show action buttons in menus'), 'show-menu-actions', group);
+        // Group top processes by name
+        this.addActionRow(_('Group top processes by command'), 'group-procs', group);
         return page;
     }
     buildCpuPage() {
@@ -97,6 +99,8 @@ export default class TopHatPrefs extends ExtensionPreferences {
         this.addComboRow(_('Show as'), choices, 'cpu-display', group);
         // Show each core
         this.addActionRow(_('Show each core'), 'cpu-show-cores', group);
+        // Sort cores by usage
+        this.addActionRow(_('Sort cores by usage'), 'cpu-sort-cores', group);
         // Normalize process CPU usage
         this.addActionRow(_('Normalize per-process CPU usage by CPU cores'), 'cpu-normalize-proc-use', group);
         return page;

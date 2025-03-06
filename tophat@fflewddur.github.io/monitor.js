@@ -15,6 +15,7 @@ import Gio from 'gi://Gio';
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 import Shell from 'gi://Shell';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import { Extension, ngettext, } from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -30,11 +31,46 @@ export class TopProc {
     usage;
     in;
     out;
+    tooltip;
+    tooltipLabel;
     constructor() {
-        this.cmd = new St.Label();
+        this.cmd = new St.Label({ reactive: true, track_hover: true });
         this.usage = new St.Label();
         this.in = new St.Label();
         this.out = new St.Label();
+        this.tooltip = null;
+        this.tooltipLabel = new PopupMenu.PopupMenuItem('', {
+            style_class: 'tophat-tooltip',
+        });
+        this.tooltipLabel.label.xExpand = true;
+    }
+    setCmd(cmd) {
+        this.cmd.text = cmd;
+        this.tooltipLabel.label.text = cmd;
+    }
+    setTooltip() {
+        if (this.tooltip) {
+            return;
+        }
+        this.tooltip = new PopupMenu.PopupMenu(this.cmd, 0.25, St.Side.TOP);
+        this.tooltip.addMenuItem(this.tooltipLabel);
+        Main.layoutManager.addChrome(this.tooltip.actor);
+        this.tooltip.actor.hide();
+        this.cmd.connect('event', (actor, event) => {
+            if (event.type() === Clutter.EventType.ENTER) {
+                if (this.tooltipLabel.label.text &&
+                    this.tooltipLabel.label.text.length > 35) {
+                    this.tooltip?.open(true);
+                }
+            }
+            else if (event.type() === Clutter.EventType.LEAVE) {
+                this.tooltip?.close(true);
+            }
+        });
+        this.cmd.connect('destroy', () => {
+            this.tooltip?.destroy();
+            this.tooltip = null;
+        });
     }
 }
 export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends PanelMenu.Button {
@@ -56,6 +92,7 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
     themeContextChanged;
     vitals;
     vitalsSignals;
+    panelStyleChanged;
     constructor(nameText, metadata, gsettings) {
         super(0.5, nameText, false);
         this.monitorName = nameText;
@@ -82,6 +119,18 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
             x_align: Clutter.ActorAlign.CENTER,
             reactive: true,
             x_expand: true,
+        });
+        this.panelStyleChanged = Main.panel.connect('style-changed', (p) => {
+            if (p.has_style_class_name('transparent-top-bar')) {
+                if (this.meter) {
+                    this.meter.add_style_class_name('transparent-meter');
+                }
+            }
+            else {
+                if (this.meter) {
+                    this.meter.remove_style_class_name('transparent-meter');
+                }
+            }
         });
         this.gsettings.bind('show-icons', this.icon, 'visible', Gio.SettingsBindFlags.GET);
         this.gsettings.bind('show-menu-actions', this.menuActionBox, 'visible', Gio.SettingsBindFlags.GET);
@@ -215,6 +264,10 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
             this.vitals?.disconnect(id);
         }
         this.vitalsSignals.length = 0;
+        if (this.panelStyleChanged > 0) {
+            Main.panel.disconnect(this.panelStyleChanged);
+            this.panelStyleChanged = 0;
+        }
         this.meter.destroy();
         this.box.destroy();
         this.themeContext.disconnect(this.themeContextChanged);

@@ -22,6 +22,7 @@ const RE_DISK_STATS = /^\s*\d+\s+\d+\s+(\w+)\s+\d+\s+\d+\s+(\d+)\s+\d+\s+\d+\s+\
 const RE_NVME_DEV = /^nvme\d+n\d+$/;
 const RE_BLOCK_DEV = /^[^\d]+$/;
 const RE_CMD = /\/*[^\s]*\/([^\s]*)/;
+const RE_LAUNCHER = /[^\s]*(python\d*|gjs)\b[^/]*(\/.*)$/;
 export const Vitals = GObject.registerClass({
     GTypeName: 'Vitals',
     Properties: {
@@ -72,6 +73,7 @@ export const Vitals = GObject.registerClass({
     summaryLoop = 0;
     detailsLoop = 0;
     fsLoop = 0;
+    groupRelated;
     showCpu;
     showMem;
     showNet;
@@ -114,6 +116,11 @@ export const Vitals = GObject.registerClass({
                 SummaryIntervalDefault * refreshRateModifier(settings);
             this.stop();
             this.start();
+        });
+        this.settingSignals.push(id);
+        this.groupRelated = gsettings.get_boolean('group-procs');
+        id = this.gsettings.connect('changed::group-procs', (settings) => {
+            this.groupRelated = settings.get_boolean('group-procs');
         });
         this.settingSignals.push(id);
         this.showCpu = gsettings.get_boolean('show-cpu');
@@ -327,7 +334,7 @@ export const Vitals = GObject.registerClass({
                     const m = line.match(re);
                     if (m && !m[1]) {
                         // These are aggregate CPU statistics
-                        const usedTime = parseInt(m[2]) + parseInt(m[4]);
+                        const usedTime = parseInt(m[2]) + parseInt(m[3]) + parseInt(m[4]);
                         const idleTime = parseInt(m[5]);
                         this.cpuState.update(usedTime, idleTime);
                         usage.aggregate = this.cpuState.usage();
@@ -335,7 +342,7 @@ export const Vitals = GObject.registerClass({
                     else if (m) {
                         // These are per-core statistics
                         const core = parseInt(m[1]);
-                        const usedTime = parseInt(m[2]) + parseInt(m[4]);
+                        const usedTime = parseInt(m[2]) + parseInt(m[3]) + parseInt(m[4]);
                         const idleTime = parseInt(m[5]);
                         this.cpuState.updateCore(core, usedTime, idleTime);
                         usage.core[core] = this.cpuState.coreUsage(core);
@@ -364,7 +371,7 @@ export const Vitals = GObject.registerClass({
                         const m = line.match(re);
                         if (m && !m[1]) {
                             // These are aggregate CPU statistics
-                            const usedTime = parseInt(m[2]) + parseInt(m[4]);
+                            const usedTime = parseInt(m[2]) + parseInt(m[3]) + parseInt(m[4]);
                             const idleTime = parseInt(m[5]);
                             this.cpuState.updateDetails(usedTime + idleTime);
                             break;
@@ -601,10 +608,10 @@ export const Vitals = GObject.registerClass({
             let i = 0;
             for (const name of psFiles) {
                 promises.push(this.readProcFiles(name, curProcs));
-                if (i >= 3) {
+                if (i >= 5) {
                     await Promise.allSettled(promises);
-                    // sleep for 2 ms
-                    await new Promise((r) => setTimeout(r, 2));
+                    // sleep for 1 ms
+                    await new Promise((r) => setTimeout(r, 1));
                     promises = [];
                     i = 0;
                 }
@@ -612,6 +619,7 @@ export const Vitals = GObject.registerClass({
                     i++;
                 }
             }
+            await Promise.allSettled(promises);
             this.procs = curProcs;
             // console.timeEnd('reading process details');
             // console.time('hashing procs');
@@ -787,6 +795,9 @@ export const Vitals = GObject.registerClass({
     }
     getTopCpuProcs(n) {
         let top = Array.from(this.procs.values());
+        if (this.groupRelated) {
+            top = groupRelatedProcs(top);
+        }
         top = top.sort((x, y) => {
             return x.cpuUsage() - y.cpuUsage();
         });
@@ -800,6 +811,9 @@ export const Vitals = GObject.registerClass({
     }
     getTopMemProcs(n) {
         let top = Array.from(this.procs.values());
+        if (this.groupRelated) {
+            top = groupRelatedProcs(top);
+        }
         top = top.sort((x, y) => {
             return x.memUsage() - y.memUsage();
         });
@@ -809,6 +823,9 @@ export const Vitals = GObject.registerClass({
     }
     getTopDiskProcs(n) {
         let top = Array.from(this.procs.values());
+        if (this.groupRelated) {
+            top = groupRelatedProcs(top);
+        }
         top = top.sort((x, y) => {
             return (x.diskReads() + x.diskWrites() - (y.diskReads() + y.diskWrites()));
         });
@@ -1478,37 +1495,40 @@ class DiskActivity {
 }
 class Process {
     id = '';
+    iterationCpu = 0; // Number of times we've loaded CPU activity for this process
+    iterationIo = 0; // Number of times we've loaded IO activity for this process
     cmd = '';
     cmdLoaded = false;
     utime = 0;
     stime = 0;
     pss = 0;
-    cpu = -1;
-    cpuPrev = -1;
+    cpu = 0;
+    cpuPrev = 0;
     cpuTotal = 0;
-    diskRead = -1;
-    diskWrite = -1;
-    diskReadPrev = -1;
-    diskWritePrev = -1;
+    diskRead = 0;
+    diskWrite = 0;
+    diskReadPrev = 0;
+    diskWritePrev = 0;
+    count = 1;
     cpuUsage() {
-        if (this.cpuPrev < 0) {
-            return 0;
-        }
+        // if (this.cpuPrev < 0) {
+        // return 0;
+        // }
         return (this.cpu - this.cpuPrev) / this.cpuTotal;
     }
     memUsage() {
         return this.pss;
     }
     diskReads() {
-        if (this.diskReadPrev < 0) {
-            return 0;
-        }
+        // if (this.diskReadPrev < 0) {
+        //   return 0;
+        // }
         return (this.diskRead - this.diskReadPrev) / DetailsInterval;
     }
     diskWrites() {
-        if (this.diskWritePrev < 0) {
-            return 0;
-        }
+        // if (this.diskWritePrev < 0) {
+        //   return 0;
+        // }
         return (this.diskWrite - this.diskWritePrev) / DetailsInterval;
     }
     setTotalTime(t) {
@@ -1551,15 +1571,33 @@ class Process {
         if (content) {
             this.cmd = content;
             // If this is an absolute cmd path, remove the path
-            if (content[0] === '/') {
-                const m = content.match(RE_CMD);
+            if (content[0] === '/' || content[0] === '.') {
+                let m = content.match(RE_CMD);
                 if (m) {
-                    // console.log(`parsing '${content}' to '${m[1]}'`);
-                    this.cmd = m[1];
+                    const cmd = m[1];
+                    m = content.match(RE_LAUNCHER);
+                    if (m && m[2]) {
+                        this.parseCmd(m[2]);
+                    }
+                    else {
+                        this.cmd = cmd;
+                    }
                 }
             }
             this.cmdLoaded = true;
         }
+    }
+    groupWith(other) {
+        this.utime += other.utime;
+        this.stime += other.stime;
+        this.pss += other.pss;
+        this.cpu += other.cpu;
+        this.cpuPrev += other.cpuPrev;
+        this.diskRead += other.diskRead;
+        this.diskReadPrev += other.diskReadPrev;
+        this.diskWrite += other.diskWrite;
+        this.diskWritePrev += other.diskWritePrev;
+        this.count += other.count;
     }
 }
 function readKb(line) {
@@ -1582,4 +1620,30 @@ function refreshRateModifier(settings) {
             break;
     }
     return modifier;
+}
+// Take an array of processes and aggregate their statistics by their 'cmd' property
+function groupRelatedProcs(top) {
+    const grouped = new Map();
+    for (const v of top) {
+        let p = grouped.get(v.cmd);
+        if (p) {
+            p.groupWith(v);
+        }
+        else {
+            p = new Process();
+            p.cmd = v.cmd;
+            p.cmdLoaded = v.cmdLoaded;
+            p.cpu = v.cpu;
+            p.cpuPrev = v.cpuPrev;
+            p.cpuTotal = v.cpuTotal;
+            p.diskRead = v.diskRead;
+            p.diskReadPrev = v.diskReadPrev;
+            p.diskWrite = v.diskWrite;
+            p.diskWritePrev = v.diskWritePrev;
+            p.pss = v.pss;
+        }
+        grouped.set(p.cmd, p);
+    }
+    top = Array.from(grouped.values());
+    return top;
 }
