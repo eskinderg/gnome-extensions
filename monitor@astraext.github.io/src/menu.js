@@ -23,6 +23,7 @@ import Shell from 'gi://Shell';
 import Mtk from 'gi://Mtk';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import Signal from './signal.js';
 import Utils from './utils/utils.js';
 import Grid from './grid.js';
 import Config from './config.js';
@@ -30,8 +31,8 @@ class MenuBase extends PopupMenu.PopupMenu {
     constructor(sourceActor, arrowAlignment, params = {}) {
         super(sourceActor, arrowAlignment, params.arrowSide ?? MenuBase.openingSide);
         this.lastForcedUpdate = new Map();
-        if (params.name)
-            Utils.verbose(`Creating ${params.name}`);
+        this.name = params.name ?? 'Unnamed Menu';
+        Utils.verbose(`Creating ${this.name}`);
         if (params.scrollable) {
             const scrollView = new St.ScrollView({
                 xExpand: true,
@@ -125,38 +126,38 @@ class MenuBase extends PopupMenu.PopupMenu {
         const appSys = Shell.AppSystem.get_default();
         let app = appSys.lookup_app('org.gnome.SystemMonitor.desktop');
         if (app) {
-            const button = new St.Button({ styleClass: 'button' });
-            button.child = new St.Icon({
+            this.systemMonitorButton = new St.Button({ styleClass: 'button' });
+            this.systemMonitorButton.child = new St.Icon({
                 gicon: Utils.getLocalIcon('am-system-monitor-symbolic'),
                 fallbackIconName: 'org.gnome.SystemMonitor-symbolic',
             });
-            button.connect('clicked', () => {
+            Signal.connect(this.systemMonitorButton, 'clicked', () => {
                 this.close(true);
                 app.activate();
             });
-            this.utilityBox.add_child(button);
+            this.utilityBox.add_child(this.systemMonitorButton);
         }
         else {
             app = appSys.lookup_app('gnome-system-monitor.desktop');
             if (app) {
-                const button = new St.Button({ styleClass: 'button' });
-                button.child = new St.Icon({
+                this.systemMonitorButton = new St.Button({ styleClass: 'button' });
+                this.systemMonitorButton.child = new St.Icon({
                     gicon: Utils.getLocalIcon('am-system-monitor-symbolic'),
                     fallbackIconName: 'org.gnome.SystemMonitor-symbolic',
                 });
-                button.connect('clicked', () => {
+                Signal.connect(this.systemMonitorButton, 'clicked', () => {
                     this.close(true);
                     app.activate();
                 });
-                this.utilityBox.add_child(button);
+                this.utilityBox.add_child(this.systemMonitorButton);
             }
         }
-        const button = new St.Button({ styleClass: 'button' });
-        button.child = new St.Icon({
+        this.preferencesButton = new St.Button({ styleClass: 'button' });
+        this.preferencesButton.child = new St.Icon({
             gicon: Utils.getLocalIcon('am-settings-symbolic'),
             fallbackIconName: 'preferences-system-symbolic',
         });
-        button.connect('clicked', () => {
+        Signal.connect(this.preferencesButton, 'clicked', () => {
             this.close(true);
             try {
                 if (category)
@@ -169,11 +170,11 @@ class MenuBase extends PopupMenu.PopupMenu {
                 Utils.log(`Error opening settings: ${err}`);
             }
         });
-        this.utilityBox.add_child(button);
+        this.utilityBox.add_child(this.preferencesButton);
         this.addToMenu(this.utilityBox, this.grid.getNumCols());
     }
     async onOpen() { }
-    async onClose() { }
+    onClose() { }
     needsUpdate(code, forced = false) {
         if (forced) {
             const lastUpdate = this.lastForcedUpdate.get(code);
@@ -188,7 +189,22 @@ class MenuBase extends PopupMenu.PopupMenu {
         Utils.error('update() needs to be overridden');
     }
     destroy() {
+        this.close(false);
         Config.clear(this);
+        Signal.clear(this);
+        Signal.clear(this.systemMonitorButton);
+        Signal.clear(this.preferencesButton);
+        this.onClose();
+        this.systemMonitorButton?.destroy();
+        this.systemMonitorButton = undefined;
+        this.preferencesButton?.destroy();
+        this.preferencesButton = undefined;
+        this.grid?.destroy();
+        this.grid = undefined;
+        this.statusMenu?.destroy();
+        this.statusMenu = undefined;
+        this.removeAll();
+        Main.uiGroup.remove_child(this.actor);
         super.destroy();
     }
 }

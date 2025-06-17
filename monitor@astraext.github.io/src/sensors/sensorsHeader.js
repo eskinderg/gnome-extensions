@@ -376,15 +376,31 @@ export default GObject.registerClass(class SensorsHeader extends Header {
     destroy() {
         Config.clear(this);
         Utils.sensorsMonitor.unlisten(this);
-        Config.clear(this.icon);
+        if (this.icon) {
+            Config.clear(this.icon);
+            Utils.sensorsMonitor.unlisten(this.icon);
+            this.icon.destroy();
+            this.icon = undefined;
+        }
         if (this.valuesContainer) {
             Config.clear(this.valuesContainer);
             Utils.sensorsMonitor.unlisten(this.valuesContainer);
+            this.valuesContainer.destroy();
+            this.valuesContainer = undefined;
+        }
+        if (this.tooltipItem) {
+            Config.clear(this.tooltipItem);
+            Utils.sensorsMonitor.unlisten(this.tooltipItem);
+            this.tooltipItem.destroy();
+            this.tooltipItem = undefined;
         }
         if (this.tooltipMenu) {
             Config.clear(this.tooltipMenu);
             Utils.sensorsMonitor.unlisten(this.tooltipMenu);
             this.tooltipMenu.close(false);
+            Main.uiGroup.remove_child(this.tooltipMenu.actor);
+            this.tooltipMenu.destroy();
+            this.tooltipMenu = undefined;
         }
         super.destroy();
     }

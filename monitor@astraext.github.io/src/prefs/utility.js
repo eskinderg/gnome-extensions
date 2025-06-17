@@ -152,7 +152,8 @@ export default class Utility {
         group = new Adw.PreferencesGroup({ title: _('Experimental Features') });
         PrefsUtils.addSwitchRow({
             title: _('PosixSpawn Subprocess'),
-            subtitle: _('Experimental posix_spawn() subprocess monitoring.'),
+            subtitle: _('Experimental posix_spawn() subprocess monitoring.\n' +
+                'This might help with UI performance issues.'),
         }, {
             watch: 'experimental-features',
             get: () => {

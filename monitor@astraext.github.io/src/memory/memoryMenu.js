@@ -479,7 +479,7 @@ export default class MemoryMenu extends MenuBase {
         Utils.memoryMonitor.listen(this, 'swapUsage', this.update.bind(this, 'swapUsage', false));
         Utils.memoryMonitor.requestUpdate('swapUsage');
     }
-    async onClose() {
+    onClose() {
         Utils.memoryMonitor.unlisten(this, 'memoryUsage');
         Utils.memoryMonitor.unlisten(this.graph, 'memoryUsage');
         Utils.memoryMonitor.unlisten(this, 'topProcesses');
@@ -746,16 +746,19 @@ export default class MemoryMenu extends MenuBase {
         }
     }
     destroy() {
-        this.close(true);
-        this.removeAll();
-        if (this.memoryUsagePopup) {
-            this.memoryUsagePopup.destroy();
-            this.memoryUsagePopup = null;
-        }
-        if (this.topProcessesPopup) {
-            this.topProcessesPopup.destroy();
-            this.topProcessesPopup = null;
-        }
+        this.close(false);
+        this.onClose();
+        Config.clear(this);
+        this.memoryBar?.destroy();
+        this.memoryBar = undefined;
+        this.graph?.destroy();
+        this.graph = undefined;
+        this.memoryUsagePopup?.destroy();
+        this.memoryUsagePopup = undefined;
+        this.topProcessesPopup?.destroy();
+        this.topProcessesPopup = undefined;
+        this.memorySwapPopup?.destroy();
+        this.memorySwapPopup = undefined;
         super.destroy();
     }
 }

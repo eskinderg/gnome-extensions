@@ -55,10 +55,10 @@ export default class MemoryMonitor extends Monitor {
         return Config.get_double('memory-update');
     }
     reset() {
-        this.topProcessesCache.reset();
-        this.updateMemoryUsageTask.cancel();
-        this.updateTopProcessesTask.cancel();
-        this.updateSwapUsageTask.cancel();
+        this.topProcessesCache?.reset();
+        this.updateMemoryUsageTask?.cancel();
+        this.updateTopProcessesTask?.cancel();
+        this.updateSwapUsageTask?.cancel();
     }
     start() {
         super.start();
@@ -445,7 +445,16 @@ export default class MemoryMonitor extends Monitor {
         return true;
     }
     destroy() {
+        this.stop();
         Config.clear(this);
+        this.topProcessesCache.reset();
+        this.topProcessesCache = undefined;
+        this.updateMemoryUsageTask?.cancel();
+        this.updateMemoryUsageTask = undefined;
+        this.updateTopProcessesTask?.cancel();
+        this.updateTopProcessesTask = undefined;
+        this.updateSwapUsageTask?.cancel();
+        this.updateSwapUsageTask = undefined;
         super.destroy();
     }
 }

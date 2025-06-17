@@ -19,17 +19,20 @@ export default class PanelWorldClockPreferences extends ExtensionPreferences {
     const mySettings = this.getSettings()
     const clocksSettings = getClocksSettings()
 
-    mySettings.bind('hide-local',   ui.get_object('local-cb'),     'active', Gio.SettingsBindFlags.DEFAULT)
-    mySettings.bind('num-buttons',  ui.get_object('num-adj'),      'value',  Gio.SettingsBindFlags.DEFAULT)
-    mySettings.bind('num-buttons2', ui.get_object('num-adj2'),     'value',  Gio.SettingsBindFlags.DEFAULT)
-    mySettings.bind('show-city',    ui.get_object('show-city-cb'), 'active', Gio.SettingsBindFlags.DEFAULT)
-    mySettings.bind('opaque',       ui.get_object('opaque-cb'),    'active', Gio.SettingsBindFlags.DEFAULT)
+    mySettings.bind('hide-local',   ui.get_object('local-cb'),       'active', Gio.SettingsBindFlags.DEFAULT)
+    mySettings.bind('num-buttons',  ui.get_object('num-adj'),        'value',  Gio.SettingsBindFlags.DEFAULT)
+    mySettings.bind('num-buttons2', ui.get_object('num-adj2'),       'value',  Gio.SettingsBindFlags.DEFAULT)
+    mySettings.bind('show-city',    ui.get_object('show-city-cb'),   'active', Gio.SettingsBindFlags.DEFAULT)
+    mySettings.bind('opaque',       ui.get_object('opaque-cb'),      'active', Gio.SettingsBindFlags.DEFAULT)
+    mySettings.bind('in-calendar',  ui.get_object('in-calendar-cb'), 'active', Gio.SettingsBindFlags.DEFAULT)
 
     const self = this
 
     const positions_button_syms = ['LR', 'ML', 'M1', 'MR', 'RL']
     const positionFromSetting = () => {
-      if (self._position_inhibitor) { return }
+      if (self._position_inhibitor)
+        return
+
       self._position_inhibitor = true
       positions_button_syms.map(pos_symbol => {
         ui.get_object('position-' + pos_symbol)
@@ -48,7 +51,9 @@ export default class PanelWorldClockPreferences extends ExtensionPreferences {
       const cl = pos_symbol
       ui.get_object('position-' + cl).connect('toggled', object => {
         const cl2 = cl
-        if (self._position_inhibitor) { return }
+        if (self._position_inhibitor)
+          return
+
         self._position_inhibitor = true
 
         if (cl2 == mySettings.get_string('button-position2'))

@@ -31,12 +31,12 @@ export default class GpuMenuComponent {
     constructor(params) {
         this.shown = false;
         this.compact = false;
-        this.sections = [];
         this.parent = params.parent;
         if (params.compact)
             this.compact = params.compact;
         if (params.title)
             this.title = params.title;
+        this.sections = [];
         this.topProcesses = new Map();
         this.mainSensors = new Map();
         this.init();
@@ -1568,10 +1568,49 @@ export default class GpuMenuComponent {
     }
     clear() { }
     destroy() {
+        this.onClose();
         Config.clear(this);
         if (this.title)
             Config.clear(this.title);
         if (this.noGPULabel)
             Config.clear(this.noGPULabel);
+        if (this.sections) {
+            for (const section of this.sections) {
+                section.vram.bar?.destroy();
+                section.vram.bar = undefined;
+                section.activity.gfxBar?.destroy();
+                section.activity.gfxBar = undefined;
+                if (section.activityPopup) {
+                    for (const pipe of section.activityPopup.pipes) {
+                        pipe.bar?.destroy();
+                        pipe.bar = undefined;
+                    }
+                    section.activityPopup.destroy();
+                    section.activityPopup = undefined;
+                }
+                if (section.vramPopup) {
+                    for (const pipe of section.vramPopup.pipes) {
+                        pipe.bar?.destroy();
+                        pipe.bar = undefined;
+                    }
+                    section.vramPopup.destroy();
+                    section.vramPopup = undefined;
+                }
+                section.infoPopup?.destroy();
+                section.infoPopup = undefined;
+                section.displaysPopup?.destroy();
+                section.displaysPopup = undefined;
+                section.topProcessesPopup?.destroy();
+                section.topProcessesPopup = undefined;
+                section.sensorsPopup?.destroy();
+                section.sensorsPopup = undefined;
+            }
+            this.sections = undefined;
+        }
+        this.topProcesses = undefined;
+        this.mainSensors = undefined;
+        this.container?.remove_all_children();
+        this.container?.destroy();
+        this.container = undefined;
     }
 }

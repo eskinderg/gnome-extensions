@@ -36,10 +36,10 @@ export default class GpuMenu extends MenuBase {
         Utils.gpuMonitor.listen(this, 'gpuUpdate', this.update.bind(this, 'gpuUpdate', false));
     }
     async onOpen() {
-        this.gpuSection.onOpen();
+        this.gpuSection?.onOpen();
     }
-    async onClose() {
-        this.gpuSection.onClose();
+    onClose() {
+        this.gpuSection?.onClose();
     }
     update(code, forced = false, ...args) {
         if (!this.needsUpdate(code, forced))
@@ -48,14 +48,16 @@ export default class GpuMenu extends MenuBase {
             const show = Config.get_boolean('gpu-header-show');
             if (!show)
                 return;
-            this.gpuSection.update(args[0]);
+            this.gpuSection?.update(args[0]);
         }
     }
     destroy() {
-        this.close(true);
-        this.removeAll();
-        Utils.gpuMonitor.unlisten(this);
+        this.close(false);
+        this.onClose();
         Config.clear(this);
+        Utils.gpuMonitor.unlisten(this);
+        this.gpuSection?.destroy();
+        this.gpuSection = undefined;
         super.destroy();
     }
 }

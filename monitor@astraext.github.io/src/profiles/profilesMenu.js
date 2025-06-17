@@ -78,5 +78,6 @@ export default class ProfilesMenu extends PopupMenu.PopupMenu {
         this.freed = true;
         this.removeAll();
         Main.uiGroup.remove_child(this.actor);
+        this.destroy();
     }
 }

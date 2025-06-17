@@ -20,6 +20,7 @@
 import GLib from 'gi://GLib';
 import Gio from 'gi://Gio';
 import Config from '../config.js';
+import Signal from '../signal.js';
 import CommandSubprocess from './commandSubprocess.js';
 import CommandHelper from './commandHelper.js';
 import XMLParser from './xmlParser.js';
@@ -66,20 +67,35 @@ class Utils {
         updateExplicitZero();
     }
     static clear() {
-        Utils.xmlParser = null;
-        Utils.performanceMap = null;
-        Utils.commandsPath = null;
-        for (const task of Utils.lowPriorityTasks)
-            GLib.source_remove(task);
+        for (const task of Utils.lowPriorityTasks) {
+            try {
+                GLib.source_remove(task);
+            }
+            catch (e) {
+                Utils.warn('Error removing lowPriorityTask', e instanceof Error ? e : undefined);
+            }
+        }
         Utils.lowPriorityTasks = [];
-        for (const task of Utils.timeoutTasks)
-            GLib.source_remove(task);
+        for (const task of Utils.timeoutTasks) {
+            try {
+                GLib.source_remove(task);
+            }
+            catch (e) {
+                Utils.warn('Error removing timeoutTask', e instanceof Error ? e : undefined);
+            }
+        }
         Utils.timeoutTasks = [];
         try {
             Config.clearAll();
         }
         catch (e) {
             Utils.error('Error clearing config', e);
+        }
+        try {
+            Signal.clearAll();
+        }
+        catch (e) {
+            Utils.error('Error clearing signal', e);
         }
         try {
             Utils.processorMonitor?.stop();
@@ -98,8 +114,12 @@ class Utils {
         catch (e) {
             Utils.error('Error stopping or destroying monitor', e);
         }
+        Utils.xmlParser = null;
+        Utils.performanceMap = null;
+        Utils.commandsPath = null;
+        Utils.lspciCached = undefined;
         Utils.lastCachedHwmonDevices = 0;
-        Utils.cachedHwmonDevices = new Map();
+        Utils.cachedHwmonDevices = undefined;
         Utils.processorMonitor = undefined;
         Utils.gpuMonitor = undefined;
         Utils.memoryMonitor = undefined;
@@ -109,6 +129,15 @@ class Utils {
         Utils.extension = undefined;
         Utils.metadata = undefined;
         Config.settings = undefined;
+        if (Utils.uptimeTimer) {
+            try {
+                GLib.source_remove(Utils.uptimeTimer);
+                Utils.uptimeTimer = 0;
+            }
+            catch (e) {
+                Utils.warn('Error removing uptime timer', e instanceof Error ? e : undefined);
+            }
+        }
     }
     static async initializeGTop() {
         try {
@@ -433,16 +462,6 @@ class Utils {
             collecting--;
         }
         return results;
-    }
-    static GPUIsInUse(lspciOutputs, gpu) {
-        for (const lspciOutput of lspciOutputs) {
-            const isPassthrough = lspciOutput.includes('vfio-pci');
-            if (isPassthrough)
-                continue;
-            if (lspciOutput.toLowerCase().includes(gpu))
-                return true;
-        }
-        return false;
     }
     static hasAmdGpuTop() {
         return Utils.commandPathLookup('amdgpu_top -V') !== false;
@@ -919,7 +938,7 @@ class Utils {
                 const addressRegex = /^((?:[0-9a-fA-F]{4}:)?[0-9a-fA-F]{2}):([0-9a-fA-F]{2})\.([0-9a-fA-F]) /;
                 const addressMatch = addressRegex.exec(firstLine);
                 if (!addressMatch) {
-                    Utils.warn('Error getting GPUs list: ' + firstLine + ' does not match address');
+                    Utils.log('Error getting GPUs list: ' + firstLine + ' does not match address');
                     continue;
                 }
                 let domain = addressMatch[1];
@@ -1094,8 +1113,9 @@ class Utils {
     }
     static getUptime(callback) {
         const syncTime = () => {
-            if (Utils.uptimeTimer)
+            if (Utils.uptimeTimer) {
                 GLib.source_remove(Utils.uptimeTimer);
+            }
             Utils.cachedUptimeSeconds = 0;
             try {
                 const fileContents = GLib.file_get_contents('/proc/uptime');
@@ -1118,7 +1138,7 @@ class Utils {
         syncTime();
         return {
             stop: () => {
-                if (Utils.uptimeTimer !== 0) {
+                if (Utils.uptimeTimer) {
                     GLib.source_remove(Utils.uptimeTimer);
                     Utils.uptimeTimer = 0;
                 }
@@ -1227,7 +1247,7 @@ class Utils {
             }
         }
         catch (e) {
-            Utils.error('Error getting disk list', e);
+            Utils.error('Error getting disk list async: ' + e, e);
         }
         return disks;
     }

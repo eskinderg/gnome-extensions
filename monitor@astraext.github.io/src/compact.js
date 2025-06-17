@@ -21,6 +21,7 @@ import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
+import Signal from './signal.js';
 import Header from './header.js';
 import Config from './config.js';
 import Utils from './utils/utils.js';
@@ -38,8 +39,8 @@ export default GObject.registerClass(class CompactHeader extends Header {
         this.compacted = Config.get_boolean('compact-mode');
         this.buildIcon();
         Config.connect(this, 'changed::compact-mode', this.refresh.bind(this));
-        this.connect('enter-event', this.start_hover.bind(this));
-        this.connect('leave-event', this.end_hover.bind(this));
+        Signal.connect(this, 'enter-event', this.start_hover.bind(this));
+        Signal.connect(this, 'leave-event', this.end_hover.bind(this));
         Config.connect(this, 'changed::compact-mode-activation', () => {
             this.compacted = Config.get_boolean('compact-mode');
             if (Config.get_boolean('compact-mode-start-expanded'))
@@ -145,6 +146,7 @@ export default GObject.registerClass(class CompactHeader extends Header {
     }
     destroy() {
         Config.clear(this);
+        Signal.clear(this);
         super.destroy();
     }
 });

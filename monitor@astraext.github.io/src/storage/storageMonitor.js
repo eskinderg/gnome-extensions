@@ -106,14 +106,14 @@ export default class StorageMonitor extends Monitor {
             devices: null,
             time: -1,
         };
-        this.topProcessesCache.reset();
+        this.topProcessesCache?.reset();
         this.previousPidsIO = new Map();
-        this.updateMountpointCache.cancel();
-        this.updateStorageUsageTask.cancel();
-        this.updateTopProcessesTask.cancel();
-        this.updateStorageIOTask.cancel();
-        this.updateStorageInfoTask.cancel();
-        this.disksCache.clear();
+        this.updateMountpointCache?.cancel();
+        this.updateStorageUsageTask?.cancel();
+        this.updateTopProcessesTask?.cancel();
+        this.updateStorageIOTask?.cancel();
+        this.updateStorageInfoTask?.cancel();
+        this.disksCache?.clear();
     }
     checkMainDisk() {
         let storageMain = Config.get_string('storage-main');
@@ -136,7 +136,7 @@ export default class StorageMonitor extends Monitor {
         this.reset();
     }
     startIOTop() {
-        if (this.updateStorageIOTopTask.isRunning) {
+        if (this.updateStorageIOTopTask?.isRunning ?? false) {
             return;
         }
         const pkexecPath = Utils.commandPathLookup('pkexec --version');
@@ -153,7 +153,7 @@ export default class StorageMonitor extends Monitor {
         });
     }
     stopIOTop() {
-        if (this.updateStorageIOTopTask.isRunning) {
+        if (this.updateStorageIOTopTask?.isRunning) {
             this.updateStorageIOTopTask.stop();
         }
     }
@@ -711,7 +711,28 @@ export default class StorageMonitor extends Monitor {
         return false;
     }
     destroy() {
+        this.stop();
         Config.clear(this);
+        this.updateMountpointCache?.cancel();
+        this.updateMountpointCache = undefined;
+        this.updateStorageUsageTask?.cancel();
+        this.updateStorageUsageTask = undefined;
+        this.updateTopProcessesTask?.cancel();
+        this.updateTopProcessesTask = undefined;
+        this.updateStorageIOTask?.cancel();
+        this.updateStorageIOTask = undefined;
+        this.updateStorageInfoTask?.cancel();
+        this.updateStorageInfoTask = undefined;
+        this.updateStorageIOTopTask?.destroy();
+        this.updateStorageIOTopTask = undefined;
+        this.previousStorageIO = undefined;
+        this.previousDetailedStorageIO = undefined;
+        this.previousPidsIO = undefined;
+        this.topProcessesCache?.reset();
+        this.topProcessesCache = undefined;
+        this.disksCache = undefined;
+        this.diskChecks = undefined;
+        this.sectorSizes = undefined;
         super.destroy();
     }
 }

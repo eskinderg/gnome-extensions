@@ -36,13 +36,12 @@ import MenuBase from './menu.js';
 export default GObject.registerClass(class AstraMonitorContainer extends PanelMenu.Button {
     constructor() {
         super(0, 'Astra Monitor');
-        this.widgets = new Map();
         this.uuid = '';
         Utils.log('Initializing container');
-        Utils.container = this;
         const panelBox = Config.get_string('panel-box');
         if (panelBox === 'left')
             MenuBase.openingSide = St.Side.LEFT;
+        this.headers = new Map();
         this.box = new St.BoxLayout({
             vertical: false,
             xExpand: true,
@@ -56,7 +55,7 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
         this.setup();
         Config.connect(this, 'changed::panel-box', this.updatePanel.bind(this));
         Config.connect(this, 'changed::panel-box-order', this.updatePanel.bind(this));
-        Config.connect(this, 'changed::monitors-order', this.reorderWidgets.bind(this));
+        Config.connect(this, 'changed::monitors-order', this.reorderHeaders.bind(this));
         Config.connect(this, 'changed::headers-font-family', this.updateStyle.bind(this));
         Config.connect(this, 'changed::headers-font-size', this.updateStyle.bind(this));
         Config.connect(this, 'changed::panel-margin-left', this.updateStyle.bind(this));
@@ -82,13 +81,13 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
         const style = this.computeStyle();
         this.box.style = style;
     }
-    addWidget(key, widget) {
+    addHeaders(key, header) {
         Utils.log('Adding widget: ' + key);
-        this.widgets.set(key, widget);
-        this.box.add_child(widget);
+        this.headers.set(key, header);
+        this.box.add_child(header);
     }
-    reorderWidgets() {
-        Utils.log('Reordering widgets');
+    reorderHeaders() {
+        Utils.log('Reordering headers');
         const monitors = Utils.getMonitorsOrder();
         let position = 0;
         if (Config.get_string('panel-box') === 'left') {
@@ -96,11 +95,11 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
             this.box.insert_child_at_index(this.compactHeader, position++);
         }
         for (const monitor of monitors) {
-            const widget = this.widgets.get(monitor);
-            if (!widget)
+            const header = this.headers.get(monitor);
+            if (!header)
                 continue;
-            this.box.remove_child(widget);
-            this.box.insert_child_at_index(widget, position++);
+            this.box.remove_child(header);
+            this.box.insert_child_at_index(header, position++);
         }
         if (Config.get_string('panel-box') !== 'left') {
             this.box.remove_child(this.compactHeader);
@@ -114,37 +113,37 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
         for (const monitor of monitors) {
             if (monitor === 'processor') {
                 const processorHeader = new ProcessorHeader();
-                this.addWidget('processor', processorHeader);
+                this.addHeaders('processor', processorHeader);
                 Main.panel.menuManager.addMenu(processorHeader.getMenu());
                 continue;
             }
             if (monitor === 'gpu') {
                 const gpuHeader = new GpuHeader();
-                this.addWidget('gpu', gpuHeader);
+                this.addHeaders('gpu', gpuHeader);
                 Main.panel.menuManager.addMenu(gpuHeader.getMenu());
                 continue;
             }
             if (monitor === 'memory') {
                 const memoryHeader = new MemoryHeader();
-                this.addWidget('memory', memoryHeader);
+                this.addHeaders('memory', memoryHeader);
                 Main.panel.menuManager.addMenu(memoryHeader.getMenu());
                 continue;
             }
             if (monitor === 'storage') {
                 const storageHeader = new StorageHeader();
-                this.addWidget('storage', storageHeader);
+                this.addHeaders('storage', storageHeader);
                 Main.panel.menuManager.addMenu(storageHeader.getMenu());
                 continue;
             }
             if (monitor === 'network') {
                 const networkHeader = new NetworkHeader();
-                this.addWidget('network', networkHeader);
+                this.addHeaders('network', networkHeader);
                 Main.panel.menuManager.addMenu(networkHeader.getMenu());
                 continue;
             }
             if (monitor === 'sensors') {
                 const sonsorHeader = new SensorsHeader();
-                this.addWidget('sensors', sonsorHeader);
+                this.addHeaders('sensors', sonsorHeader);
                 Main.panel.menuManager.addMenu(sonsorHeader.getMenu());
                 continue;
             }
@@ -155,14 +154,14 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
     addCompactHeader() {
         this.compactHeader = new CompactHeader();
         Config.bind('compact-mode', this.compactHeader, 'visible', Gio.SettingsBindFlags.GET);
-        this.addWidget('compact', this.compactHeader);
+        this.addHeaders('compact', this.compactHeader);
         this.compactHeader.compact(this.compact.bind(this));
     }
     compact(compacted) {
-        for (const monitor of this.widgets.values()) {
-            if (monitor instanceof CompactHeader)
+        for (const header of this.headers.values()) {
+            if (header instanceof CompactHeader)
                 continue;
-            monitor.setCompacted(compacted);
+            header.setCompacted(compacted);
         }
     }
     place(uuid) {
@@ -184,7 +183,7 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
         const order = Config.get_int('panel-box-order');
         Utils.log(`Reordering container in ${panelBox} box at position ${order}`);
         Main.panel._addToPanelBox(this.uuid, this, order, boxContainer);
-        this.reorderWidgets();
+        this.reorderHeaders();
     }
     destroy() {
         try {
@@ -194,13 +193,26 @@ export default GObject.registerClass(class AstraMonitorContainer extends PanelMe
             Utils.error('Error clearing container settings', e);
         }
         try {
-            for (const widget of this.widgets.values()) {
-                widget.destroy();
+            for (const header of this.headers.values()) {
+                if (header instanceof CompactHeader === false) {
+                    const menu = header.getMenu();
+                    if (menu) {
+                        Main.panel.menuManager.removeMenu(menu);
+                    }
+                }
+                this.box.remove_child(header);
+                header.destroy();
             }
+            this.headers?.clear();
+            this.headers = undefined;
+            this.compactHeader = undefined;
+            this.box.remove_all_children();
+            this.box.destroy();
+            this.remove_all_children();
+            super.destroy();
         }
         catch (e) {
-            Utils.error('Error destroying widgets', e);
+            Utils.error('Error destroying containerheaders', e);
         }
-        super.destroy();
     }
 });

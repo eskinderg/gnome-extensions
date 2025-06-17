@@ -488,35 +488,61 @@ export default GObject.registerClass(class GpuHeader extends Header {
         if (this.icon) {
             Config.clear(this.icon);
             Utils.gpuMonitor.unlisten(this.icon);
+            this.icon.destroy();
+            this.icon = undefined;
         }
         if (this.activityBar) {
             Config.clear(this.activityBar);
             Utils.gpuMonitor.unlisten(this.activityBar);
+            this.activityBar.destroy();
+            this.activityBar = undefined;
         }
         if (this.activityGraph) {
             Config.clear(this.activityGraph);
             Utils.gpuMonitor.unlisten(this.activityGraph);
+            this.activityGraph.destroy();
+            this.activityGraph = undefined;
         }
         if (this.activityPercentage) {
             Config.clear(this.activityPercentage);
             Utils.gpuMonitor.unlisten(this.activityPercentage);
+            this.activityPercentage = undefined;
         }
         if (this.memoryBar) {
             Config.clear(this.memoryBar);
             Utils.gpuMonitor.unlisten(this.memoryBar);
+            this.memoryBar.destroy();
+            this.memoryBar = undefined;
         }
         if (this.memoryGraph) {
             Config.clear(this.memoryGraph);
             Utils.gpuMonitor.unlisten(this.memoryGraph);
+            this.memoryGraph.destroy();
+            this.memoryGraph = undefined;
         }
         if (this.memoryPercentage) {
             Config.clear(this.memoryPercentage);
             Utils.gpuMonitor.unlisten(this.memoryPercentage);
+            this.memoryPercentage = undefined;
+        }
+        if (this.memoryValue) {
+            Config.clear(this.memoryValue);
+            Utils.gpuMonitor.unlisten(this.memoryValue);
+            this.memoryValue = undefined;
+        }
+        if (this.tooltipItem) {
+            Config.clear(this.tooltipItem);
+            Utils.gpuMonitor.unlisten(this.tooltipMenu);
+            this.tooltipItem.destroy();
+            this.tooltipItem = undefined;
         }
         if (this.tooltipMenu) {
             Config.clear(this.tooltipMenu);
             Utils.gpuMonitor.unlisten(this.tooltipMenu);
             this.tooltipMenu.close(false);
+            Main.uiGroup.remove_child(this.tooltipMenu.actor);
+            this.tooltipMenu.destroy();
+            this.tooltipMenu = undefined;
         }
         super.destroy();
     }

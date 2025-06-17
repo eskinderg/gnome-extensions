@@ -19,62 +19,68 @@
  */
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
-export default class CancellableTaskManager {
-    constructor() {
-        this.taskCancellable = new Gio.Cancellable();
-    }
-    run(boundTask) {
-        if (this.currentTask)
-            this.currentTask.cancel();
-        this.currentTask = this.makeCancellable(boundTask);
-        return this.currentTask.promise.finally(() => {
-            if (this.currentTask)
-                this.currentTask = undefined;
-            if (this.cancelId)
-                this.taskCancellable.disconnect(this.cancelId);
-            this.cancelId = undefined;
-        });
-    }
-    setSubprocess(subprocess) {
-        this.cancelId = this.taskCancellable.connect(() => {
-            subprocess.force_exit();
-        });
-    }
-    makeCancellable(boundTask) {
-        let rejectFn;
-        let timeoutId;
-        const promise = new Promise((resolve, reject) => {
-            rejectFn = reject;
-            timeoutId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-                timeoutId = undefined;
-                boundTask().then(resolve).catch(reject);
+class CancellableTask {
+    constructor(boundTask) {
+        this.boundTask = boundTask;
+        this.taskPromise = new Promise((resolve, reject) => {
+            this.rejectFn = reject;
+            this.timeoutId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this.boundTask().then(resolve).catch(reject);
+                this.timeoutId = undefined;
                 return GLib.SOURCE_REMOVE;
             });
         });
-        const cancel = () => {
-            if (this.cancelId) {
-                this.taskCancellable.cancel();
-                this.taskCancellable.disconnect(this.cancelId);
-                this.taskCancellable = new Gio.Cancellable();
-                this.cancelId = undefined;
-            }
-            if (timeoutId) {
-                GLib.source_remove(timeoutId);
-                timeoutId = undefined;
-            }
-            rejectFn({ isCancelled: true, message: 'Task cancelled' });
-        };
-        return { promise, cancel };
+    }
+    get promise() {
+        return this.taskPromise;
+    }
+    cancel() {
+        if (this.timeoutId) {
+            GLib.source_remove(this.timeoutId);
+            this.timeoutId = undefined;
+        }
+        if (this.rejectFn) {
+            this.rejectFn({ isCancelled: true, message: 'Task cancelled' });
+        }
+        this.rejectFn = undefined;
+    }
+}
+export default class CancellableTaskManager {
+    get cancellable() {
+        if (!this.taskCancellable) {
+            this.taskCancellable = new Gio.Cancellable();
+        }
+        return this.taskCancellable;
+    }
+    run(boundTask) {
+        this.cancel();
+        this.currentTask = new CancellableTask(boundTask);
+        return new Promise((resolve, reject) => {
+            this.currentTask.promise.then(resolve)
+                .catch(reject)
+                .finally(() => {
+                this.cancel();
+            });
+        });
+    }
+    setSubprocess(subprocess) {
+        this.cancelId = this.cancellable.connect(() => {
+            subprocess.force_exit();
+        });
     }
     cancel() {
         if (this.currentTask) {
             this.currentTask.cancel();
+            this.currentTask = undefined;
         }
+        if (this.cancelId) {
+            this.taskCancellable?.cancel();
+            this.taskCancellable?.disconnect(this.cancelId);
+            this.cancelId = undefined;
+        }
+        this.taskCancellable = undefined;
     }
     get isRunning() {
         return !!this.currentTask;
-    }
-    get cancellable() {
-        return this.taskCancellable;
     }
 }

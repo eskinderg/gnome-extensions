@@ -512,39 +512,69 @@ export default GObject.registerClass(class StorageHeader extends Header {
     destroy() {
         Config.clear(this);
         Utils.storageMonitor.unlisten(this);
-        Config.clear(this.icon);
-        if (this.percentage) {
-            Config.clear(this.percentage);
-            Utils.storageMonitor.unlisten(this.percentage);
-        }
-        if (this.value) {
-            Config.clear(this.value);
-            Utils.memoryMonitor.unlisten(this.value);
-        }
-        if (this.free) {
-            Config.clear(this.free);
-            Utils.memoryMonitor.unlisten(this.free);
+        if (this.icon) {
+            Config.clear(this.icon);
+            Utils.storageMonitor.unlisten(this.icon);
+            this.icon.destroy();
+            this.icon = undefined;
         }
         if (this.bars) {
             Config.clear(this.bars);
             Utils.storageMonitor.unlisten(this.bars);
+            this.bars.destroy();
+            this.bars = undefined;
+        }
+        if (this.percentage) {
+            Config.clear(this.percentage);
+            Utils.storageMonitor.unlisten(this.percentage);
+            this.percentage = undefined;
+        }
+        if (this.value) {
+            Config.clear(this.value);
+            Utils.memoryMonitor.unlisten(this.value);
+            this.value = undefined;
+        }
+        if (this.free) {
+            Config.clear(this.free);
+            Utils.memoryMonitor.unlisten(this.free);
+            this.free = undefined;
         }
         if (this.ioBars) {
             Config.clear(this.ioBars);
             Utils.storageMonitor.unlisten(this.ioBars);
+            this.ioBars.destroy();
+            this.ioBars = undefined;
         }
         if (this.graph) {
             Config.clear(this.graph);
             Utils.storageMonitor.unlisten(this.graph);
+            this.graph.destroy();
+            this.graph = undefined;
         }
         if (this.speedContainer) {
             Config.clear(this.speedContainer);
             Utils.storageMonitor.unlisten(this.speedContainer);
+            this.speedContainer.destroy();
+            this.speedContainer = undefined;
+        }
+        if (this.speed) {
+            Config.clear(this.speed);
+            Utils.storageMonitor.unlisten(this.speed);
+            this.speed = undefined;
+        }
+        if (this.tooltipItem) {
+            Config.clear(this.tooltipItem);
+            Utils.storageMonitor.unlisten(this.tooltipItem);
+            this.tooltipItem.destroy();
+            this.tooltipItem = undefined;
         }
         if (this.tooltipMenu) {
             Config.clear(this.tooltipMenu);
             Utils.storageMonitor.unlisten(this.tooltipMenu);
             this.tooltipMenu.close(false);
+            Main.uiGroup.remove_child(this.tooltipMenu.actor);
+            this.tooltipMenu.destroy();
+            this.tooltipMenu = undefined;
         }
         super.destroy();
     }

@@ -36,6 +36,7 @@ import Network from './src/prefs/network.js';
 import Sensors from './src/prefs/sensors.js';
 import Utility from './src/prefs/utility.js';
 import About from './src/prefs/about.js';
+import Signal from './src/signal.js';
 export default class AstraMonitorPrefs extends ExtensionPreferences {
     constructor() {
         super(...arguments);
@@ -68,21 +69,21 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
                 settings: this.getSettings(),
             });
             PrefsUtils.expanded = new Map();
-            window.connect('close-request', () => {
+            Signal.connect(window, 'close-request', () => {
                 Utils.clear();
                 this.active = null;
-                this.welcome = null;
-                this.profiles = null;
-                this.visualization = null;
-                this.processors = null;
-                this.gpu = null;
-                this.memory = null;
-                this.storage = null;
-                this.network = null;
-                this.sensors = null;
-                this.utility = null;
-                this.about = null;
-                PrefsUtils.expanded = null;
+                this.welcome = undefined;
+                this.profiles = undefined;
+                this.visualization = undefined;
+                this.processors = undefined;
+                this.gpu = undefined;
+                this.memory = undefined;
+                this.storage = undefined;
+                this.network = undefined;
+                this.sensors = undefined;
+                this.utility = undefined;
+                this.about = undefined;
+                PrefsUtils.expanded = undefined;
             });
             this.loadCustomTheme();
             window.add(new Adw.PreferencesPage());

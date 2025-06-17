@@ -188,7 +188,7 @@ export default GObject.registerClass(class MemoryHeader extends Header {
             layout: 'horizontal',
             header: true,
             mini: true,
-            width: 70,
+            width: 30,
             height: 0.8,
             breakdownConfig: 'memory-header-bars-breakdown',
         });

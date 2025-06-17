@@ -152,4 +152,8 @@ export default GObject.registerClass(class StorageGraph extends GraphBase {
         }
         ctx.$dispose();
     }
+    destroy() {
+        Config.clear(this);
+        super.destroy();
+    }
 });

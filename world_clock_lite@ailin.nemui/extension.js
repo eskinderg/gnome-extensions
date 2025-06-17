@@ -14,16 +14,17 @@ import * as PanelMenu     from 'resource:///org/gnome/shell/ui/panelMenu.js'
 import * as PopupMenu     from 'resource:///org/gnome/shell/ui/popupMenu.js'
 
 import {Extension}        from 'resource:///org/gnome/shell/extensions/extension.js'
+import {InjectionManager} from 'resource:///org/gnome/shell/extensions/extension.js'
 
 import {getClocksSettings} from './convenience.js'
 
 const _gd30 = Gettext.domain('gnome-desktop-3.0').gettext
 
-var WorldClockMultiButton = GObject.registerClass(
+const WorldClockMultiButton = GObject.registerClass(
 class WorldClockMultiButton extends PanelMenu.Button {
 
-  _init (lbt, extension) {
-    super._init(0.25)
+  constructor (lbt, extension) {
+    super(0.25)
 
     this._extn = extension
 
@@ -41,7 +42,7 @@ class WorldClockMultiButton extends PanelMenu.Button {
     this._place._delegate = this
     m.box.add_child(this._place)
 
-    let box = new St.BoxLayout({ style_class: 'location-day' })
+    const box = new St.BoxLayout({ style_class: 'location-day' })
     this._dayIcon = new St.Icon({
       icon_size: 15,
       icon_name: 'weather-clear-symbolic',
@@ -71,14 +72,9 @@ class WorldClockMultiButton extends PanelMenu.Button {
   setLbt (lbt) {
     this._lbt = lbt
 
-    let nameMap = this._extn._mySettings.get_value('name-map').deep_unpack()
-    let name
-    if (nameMap[lbt.code])
-      name = nameMap[lbt.code]
-    else
-      name = lbt.displayName
+    let name = lbt.displayNameTitle
     if (this._extn._mySettings.get_boolean('show-city')) {
-      const sfx = name.match(/ \((\w+)\)$/)
+      const sfx = name.match(/(?: \((\w+)\)|（(\w+)）)$/)
       const tz = lbt.now().format("%Z")
       if (!sfx && name != tz)
         name += ` (${tz})`
@@ -93,26 +89,27 @@ class WorldClockMultiButton extends PanelMenu.Button {
   }
 
   refresh () {
-    if (this._extn._remaking > 1) { return }
+    if (this._extn._remaking > 1)
+      return
     this._myClockDisp.set_text(this._lbt.getTime())
-    let i = this._lbt._gwInfo
+    const i = this._lbt._gwInfo
     i.update()
 
-    let night_icon_key = 'weather-clear-night'
+    const night_icon_key = 'weather-clear-night'
     let moonPhase_icon_name = castInt(i.get_value_moonphase()[1]/10) + "0"
-    while (moonPhase_icon_name.length < 3) { moonPhase_icon_name = "0" + moonPhase_icon_name }
+    while (moonPhase_icon_name.length < 3)
+      moonPhase_icon_name = "0" + moonPhase_icon_name
     moonPhase_icon_name = night_icon_key + "-" + moonPhase_icon_name
 
-    if (!this._extn._theme.has_icon(moonPhase_icon_name)) {
+    if (!this._extn._theme.has_icon(moonPhase_icon_name))
       moonPhase_icon_name = night_icon_key + '-symbolic'
-    }
 
-    let valid_map = i.get_location().get_level() <= GWeather.LocationLevel.WEATHER_STATION
+    const valid_map = i.get_location().get_level() <= GWeather.LocationLevel.WEATHER_STATION
     if (valid_map) {
-      let sunrise = i.get_value_sunrise()
-      let sunriseTime = this._fromUnix(sunrise[1])
-      let sunset = i.get_value_sunset()
-      let sunsetTime = this._fromUnix(sunset[1])
+      const sunrise = i.get_value_sunrise()
+      const sunriseTime = this._fromUnix(sunrise[1])
+      const sunset = i.get_value_sunset()
+      const sunsetTime = this._fromUnix(sunset[1])
 
       this._dayIcon.set_icon_name(!sunrise[0] && !i.is_daytime() ? moonPhase_icon_name : 'weather-clear-symbolic')
       this._nightIcon.set_icon_name(!sunset[0] && i.is_daytime() ? 'weather-clear-symbolic' : moonPhase_icon_name)
@@ -141,14 +138,15 @@ class WorldClockMultiButton extends PanelMenu.Button {
     const skipLocal = this._extn._mySettings.get_boolean('hide-local')
     let entries = 0
     this._extn._locations.map(lbt => {
-      if (skipLocal && lbt.tzSameAsLocal()) { return }
-      let display = lbt.displayName3
+      if (skipLocal && lbt.tzSameAsLocal())
+        return
+      let display = lbt.displayNameList
 
       // rtl time fix
       if (this._extn._lang_is_rtl)
         display = "\u202a" + display + "\u202c"
 
-      let item = new PopupMenu.PopupMenuItem(display)
+      const item = new PopupMenu.PopupMenuItem(display)
       item.location = lbt
       item.setOrnament(lbt.code == self._lbt.code ? PopupMenu.Ornament.CHECK : PopupMenu.Ornament.NONE)
       lm.addMenuItem(item)
@@ -164,16 +162,27 @@ class WorldClockMultiButton extends PanelMenu.Button {
         self._extn._nextTicks.push(sourceId)
       })
     })
-
-    if (entries <= 1)
-      this._selectLoc.hide()
-    else
-      this._selectLoc.show()
+    const settings = new PopupMenu.PopupMenuItem(_("Settings") + "…")
+    settings.setOrnament(PopupMenu.Ornament.NONE)
+    for (const icon of [
+      'cog-wheel-symbolic',
+      'settings-symbolic',
+      'org.gnome.Settings-symbolic',
+      ]) {
+      if (this._extn._theme.has_icon(icon)) {
+        settings._ornamentIcon.icon_name = icon
+        break
+      }
+    }
+    settings.connect('activate', actor => self._extn.openPreferences())
+    lm.addMenuItem(settings)
   }
 
   switchLbt (lbt) {
-    let lastLoc = this._lbt
-    if (lastLoc.code == lbt.code) { return }
+    const lastLoc = this._lbt
+    if (lastLoc.code == lbt.code)
+      return
+
     this._extn._buttons.map(x => {
       if (x._lbt.code == lbt.code)
         x.setLbt(lastLoc)
@@ -182,14 +191,9 @@ class WorldClockMultiButton extends PanelMenu.Button {
   }
 })
 
-const LocationBasedTime = (
 class LocationBasedTime {
 
-  constructor (...args) {
-    this._init(...args)
-  }
-
-  _init (loc, extension) {
+  constructor (loc, extension) {
     this._loc = loc
     this._extn = extension
 
@@ -199,23 +203,23 @@ class LocationBasedTime {
 
     const city = loc.has_coords() ? this._extn._world.find_nearest_city(...loc.get_coords()) : loc
 
-    this.displayName = loc.get_city_name() || city.get_name()
-    this.displayName2 = loc.get_name()
-    this.displayName4 = this.displayName2
+    this.displayNameTitle = loc.get_city_name() || city.get_name()
+    this.displayNameList = loc.get_name()
+    this.displayNameCity = this.displayNameList
 
     const country_name = loc.get_country_name()
     if (country_name)
-      this.displayName = (this.displayName ? this.displayName + ", " : "") + country_name
+      this.displayNameTitle = (this.displayNameTitle ? this.displayNameTitle + ", " : "") + country_name
 
     const country_code = loc.get_country()
     if (country_code)
-      this.displayName2 = (this.displayName2 ? this.displayName2 + " (" + country_code + ")" :
-                           country_code)
+      this.displayNameList = (this.displayNameList ? this.displayNameList + " (" + country_code + ")" : country_code)
 
-    this.displayName4 = this.displayName4 || country_name || country_code
+    if (!this.displayNameCity)
+      this.displayNameCity = country_name || country_code
 
-    if (!this.displayName)
-      this.displayName = loc.get_name()
+    if (!this.displayNameTitle)
+      this.displayNameTitle = loc.get_name()
 
     let ncode = [loc]
     let code = []
@@ -228,21 +232,22 @@ class LocationBasedTime {
         }
         let r = []
         let iter = null
-        while ((iter = x.next_child(iter)) !== null) {
+        while ((iter = x.next_child(iter)) !== null)
           r.push(iter)
-        }
         return r
       }).reduce((a, b) => a.concat(b))
     }
     this.code = code.join(",")
 
     const nameMap = this._extn._mySettings.get_value('name-map').deep_unpack()
-    if (nameMap[this.code])
-      this.displayName3 = nameMap[this.code] + (country_code ? " (" + country_code + ")" : "")
-    else
-      this.displayName3 = this.displayName2
-    if (nameMap[this.code])
-      this.displayName4 = nameMap[this.code]
+    if (nameMap[this.code]) {
+      this.displayNameTitle = nameMap[this.code]
+      this.displayNameList = nameMap[this.code] + (country_code ? " (" + country_code + ")" : "")
+      this.displayNameCity = nameMap[this.code]
+      this.name_mapped = true
+    } else {
+      this.name_mapped = false
+    }
   }
 
   now () {
@@ -251,7 +256,8 @@ class LocationBasedTime {
 
   tzSameAsLocal () {
     const now = this.now()
-    return now.get_timezone_abbreviation() == now.to_local().get_timezone_abbreviation()
+    const local = now.to_local()
+    return now.get_timezone_abbreviation() == local.get_timezone_abbreviation() && now.get_utc_offset() == local.get_utc_offset()
   }
 
   getTime () {
@@ -261,13 +267,13 @@ class LocationBasedTime {
     const format_string = _gd30((now_here.get_day_of_month() != now.get_day_of_month() ?
                                  "%a " : "") + this._extn.get12hTimeFormat(now))
     if (this._extn._mySettings.get_boolean('show-city')) {
-      const sfx = this.displayName3.match(/ \((\w+)\)$/)
-      return now.format(format_string) + " " + (this._loc.has_coords() || !sfx ? this.displayName4 : sfx[1])
+      const sfx = this.displayNameList.match(/(?: \((\w+)\)|（(\w+)）)$/)
+      return now.format(format_string) + " " + (this._loc.has_coords() || !sfx || this.name_mapped ? this.displayNameCity : (sfx[1] || sfx[2]))
     } else {
       return now.format(format_string + " %Z")
     }
   }
-})
+}
 
 const castInt = num => ~~num
 
@@ -291,10 +297,11 @@ export default class PanelWorldClockExtension extends Extension {
   }
 
   _remakeButtons () {
-    if (this._remaking) { return }
+    if (this._remaking)
+      return
     this._remaking = 2
 
-    this._locations.sort((a, b) => a.displayName3.localeCompare(b.displayName3))
+    this._locations.sort((a, b) => a.displayNameList.localeCompare(b.displayNameList))
     this._locations.sort((a, b) => a.now().get_utc_offset() - b.now().get_utc_offset())
 
     const self = this
@@ -339,9 +346,13 @@ export default class PanelWorldClockExtension extends Extension {
       const skipLocal = self._mySettings.get_boolean('hide-local')
       let done = 0
       self._buttons.map(x => {
-        if (skipLocal && x._lbt.tzSameAsLocal()) { return }
+        if (skipLocal && x._lbt.tzSameAsLocal())
+          return
+
         done += 1
-        if (done < g) { return }
+        if (done < g)
+          return
+
         if (j <= numButtons) {
           x.refresh()
           Main.panel.addToStatusArea('worldClock' + g, x, start_position + j - 1, box_name)
@@ -354,11 +365,50 @@ export default class PanelWorldClockExtension extends Extension {
     this._remaking = 0
   }
 
+  _remakeButtonsSoon () {
+    if (this._remaking)
+      return
+
+    if (this._remakeTimout)
+      GLib.Source.remove(this._remakeTimout)
+    this._remakeTimout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+      this._remakeButtons()
+      delete this._remakeTimout
+      return GLib.SOURCE_REMOVE
+    })
+
+  }
+
   _refreshLocations () {
     const world_clocks = this._clocksSettings.get_value('world-clocks')
+    const use_coords = this._mySettings.get_boolean('gweather-use-coords')
     const self = this
     this._locations = world_clocks.deep_unpack()
-      .map(e => this._world.deserialize(e.location))
+      .filter(e => e.location) // weird setting in Ubuntu
+      .map(entry => {
+        // https://gitlab.gnome.org/GNOME/libgweather/-/issues/322
+        if (use_coords) {
+          const el = entry.location.recursiveUnpack()
+          if (el && el.length === 2) {
+            const [ver, locSer] = el
+            if (ver === 1) {
+              if (locSer[2] && locSer[4] && locSer[4].length === 2) {
+                const [lat, lon] = locSer[4]
+                const location = this._world.find_nearest_city(lat * 180 / Math.PI, lon * 180 / Math.PI)
+                return location
+              }
+            } else if (ver === 2) {
+              if (locSer[2] && locSer[4] && locSer[4].length === 1 && locSer[4][0].length === 2) {
+                const [lat, lon] = locSer[4][0]
+                const location = this._world.find_nearest_city(lat * 180 / Math.PI, lon * 180 / Math.PI)
+                return location
+              }
+            }
+          }
+        }
+        const location = this._world.deserialize(entry.location)
+        return location
+      })
       .filter(e => e.get_timezone())
       .map(e => new LocationBasedTime(e, self))
 
@@ -371,6 +421,8 @@ export default class PanelWorldClockExtension extends Extension {
 
   enable () {
     this._clocksSettings = getClocksSettings()
+    this._gnomeClockSettings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' })
+    this._mySettings = this.getSettings()
     this._enableSuccess = true
     this._remaking = 0
 
@@ -381,21 +433,36 @@ export default class PanelWorldClockExtension extends Extension {
     this._clock = new GnomeDesktop.WallClock()
     this._theme = new St.IconTheme()
 
-    this._mySettings = this.getSettings()
-    this._gnomeClockSettings = new Gio.Settings({ schema: 'org.gnome.desktop.interface' })
+    this._injectionManager = new InjectionManager()
+    const self = this
+    const dateMenuWorldClock = Main.panel.statusArea.dateMenu._clocksItem
+    this._injectionManager.overrideMethod(
+      dateMenuWorldClock, '_sync', originalMethod => function () {
+        if (self._mySettings.get_boolean('in-calendar'))
+          originalMethod.apply(this, arguments)
+        else
+          this.visible = false
+      })
+    this._dateMenuWorldClockShow = dateMenuWorldClock.connect('show', function () {
+      if (!self._mySettings.get_boolean('in-calendar'))
+        dateMenuWorldClock.visible = false
+    })
 
     // rtl time fix
     this._lang_is_rtl = (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
 
     this._refreshLocations()
+    dateMenuWorldClock._sync()
 
     this._clock.connect('notify::clock', this._refreshAll.bind(this))
+    this._clock.connect('notify::timezone', this._remakeButtons.bind(this))
     this._gnomeClockSettings.connect('changed::clock-format', this._refreshAll.bind(this))
     this._clocksSettings.connect('changed::world-clocks', this._refreshLocations.bind(this))
-    this._mySettings.connect('changed', this._remakeButtons.bind(this))
-    this._clock.connect('notify::timezone', this._remakeButtons.bind(this))
+    this._mySettings.connect('changed', this._remakeButtonsSoon.bind(this))
+    this._mySettings.connect('changed::in-calendar', dateMenuWorldClock._sync.bind(dateMenuWorldClock))
+    this._mySettings.connect('changed::name-map', this._refreshLocations.bind(this))
+    this._mySettings.connect('changed::gweather-use-coords', this._refreshLocations.bind(this))
   }
-
 
   disable () {
     if (!this._enableSuccess)
@@ -403,6 +470,9 @@ export default class PanelWorldClockExtension extends Extension {
 
     this._nextTicks.map(e => GLib.Source.remove(e))
     this._nextTicks = []
+    if (this._remakeTimout)
+      GLib.Source.remove(this._remakeTimout)
+    delete this._remakeTimout
 
     this._locations = []
     this._buttons.map(x => x.destroy())
@@ -415,6 +485,12 @@ export default class PanelWorldClockExtension extends Extension {
     this._gnomeClockSettings = null
     this._clocksSettings = null
     this._mySettings = null
+
+    this._injectionManager.clear()
+    this._injectionManager = null
+    Main.panel.statusArea.dateMenu._clocksItem.disconnect(this._dateMenuWorldClockShow)
+    delete this._dateMenuWorldClockShow
+    Main.panel.statusArea.dateMenu._clocksItem._sync()
 
     this._enableSuccess = false
   }

@@ -388,27 +388,47 @@ export default GObject.registerClass(class ProcessorHeader extends Header {
     destroy() {
         Config.clear(this);
         Utils.processorMonitor.unlisten(this);
-        Config.clear(this.icon);
-        if (this.percentage) {
-            Config.clear(this.percentage);
-            Utils.processorMonitor.unlisten(this.percentage);
-        }
-        if (this.frequency) {
-            Config.clear(this.frequency);
-            Utils.processorMonitor.unlisten(this.frequency);
+        if (this.icon) {
+            Config.clear(this.icon);
+            Utils.processorMonitor.unlisten(this.icon);
+            this.icon.destroy();
+            this.icon = undefined;
         }
         if (this.bars) {
             Config.clear(this.bars);
             Utils.processorMonitor.unlisten(this.bars);
+            this.bars.destroy();
+            this.bars = undefined;
         }
         if (this.graph) {
             Config.clear(this.graph);
             Utils.processorMonitor.unlisten(this.graph);
+            this.graph.destroy();
+            this.graph = undefined;
+        }
+        if (this.percentage) {
+            Config.clear(this.percentage);
+            Utils.processorMonitor.unlisten(this.percentage);
+            this.percentage = undefined;
+        }
+        if (this.frequency) {
+            Config.clear(this.frequency);
+            Utils.processorMonitor.unlisten(this.frequency);
+            this.frequency = undefined;
+        }
+        if (this.tooltipItem) {
+            Config.clear(this.tooltipItem);
+            Utils.processorMonitor.unlisten(this.tooltipItem);
+            this.tooltipItem.destroy();
+            this.tooltipItem = undefined;
         }
         if (this.tooltipMenu) {
             Config.clear(this.tooltipMenu);
             Utils.processorMonitor.unlisten(this.tooltipMenu);
             this.tooltipMenu.close(false);
+            Main.uiGroup.remove_child(this.tooltipMenu.actor);
+            this.tooltipMenu.destroy();
+            this.tooltipMenu = undefined;
         }
         super.destroy();
     }

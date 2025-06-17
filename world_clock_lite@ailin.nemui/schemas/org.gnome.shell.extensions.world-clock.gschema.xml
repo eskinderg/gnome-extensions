@@ -44,5 +44,8 @@
     <key name="name-map" type="a{ss}">
       <default>{}</default>
     </key>
+    <key name="gweather-use-coords" type="b">
+      <default>true</default>
+    </key>
   </schema>
 </schemalist>

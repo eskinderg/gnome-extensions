@@ -7,9 +7,10 @@
   "shell-version": [
     "45",
     "46",
-    "47"
+    "47",
+    "48"
   ],
   "url": "https://github.com/noroadsleft000/gnome-network-stats",
   "uuid": "network-stats@gnome.noroadsleft.xyz",
-  "version": 26
+  "version": 27
 }

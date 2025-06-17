@@ -138,7 +138,7 @@ export default class SensorsMonitor extends Monitor {
         return this.prefSensorsSource;
     }
     reset() {
-        this.updateSensorsDataTask.cancel();
+        this.updateSensorsDataTask?.cancel();
         this.ignoredSensorsRegex = null;
         this.ignoredSensorsCategoryRegex = null;
         this.ignoredSensorsAttributeRegex = null;
@@ -405,7 +405,10 @@ export default class SensorsMonitor extends Monitor {
         return true;
     }
     destroy() {
+        this.stop();
         Config.clear(this);
+        this.updateSensorsDataTask?.cancel();
+        this.updateSensorsDataTask = undefined;
         super.destroy();
     }
 }

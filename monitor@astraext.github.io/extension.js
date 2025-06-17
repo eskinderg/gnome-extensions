@@ -48,8 +48,7 @@ export default class AstraMonitorExtension extends Extension {
         Utils.log('AstraMonitor enabled');
         this.container = new AstraMonitorContainer();
         this.timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Utils.startupDelay * 1000, () => {
-            if (this.container)
-                this.container.place(this.uuid);
+            this.container?.place(this.uuid);
             this.timeout = 0;
             Utils.ready = true;
             return false;

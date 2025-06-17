@@ -82,7 +82,7 @@ export default class GpuMonitor extends Monitor {
         super.restart();
     }
     reset() {
-        this.updateDisplaysTask.cancel();
+        this.updateDisplaysTask?.cancel();
         this.infoPipesCache = undefined;
         this.infoPipesCacheTime = 0;
     }
@@ -151,9 +151,9 @@ export default class GpuMonitor extends Monitor {
         }
     }
     stopGpuTask() {
-        if (this.updateAmdGpuTask.isRunning)
+        if (this.updateAmdGpuTask?.isRunning)
             this.updateAmdGpuTask.stop();
-        if (this.updateNvidiaGpuTask.isRunning)
+        if (this.updateNvidiaGpuTask?.isRunning)
             this.updateNvidiaGpuTask.stop();
     }
     update() {
@@ -1479,7 +1479,12 @@ export default class GpuMonitor extends Monitor {
         return true;
     }
     destroy() {
+        this.stop();
         Config.clear(this);
+        this.updateAmdGpuTask?.destroy();
+        this.updateAmdGpuTask = undefined;
+        this.updateNvidiaGpuTask?.destroy();
+        this.updateNvidiaGpuTask = undefined;
         super.destroy();
     }
 }

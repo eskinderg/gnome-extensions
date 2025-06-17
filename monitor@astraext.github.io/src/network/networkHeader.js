@@ -327,23 +327,47 @@ export default GObject.registerClass(class NetworkHeader extends Header {
     destroy() {
         Config.clear(this);
         Utils.networkMonitor.unlisten(this);
-        Config.clear(this.icon);
+        if (this.icon) {
+            Config.clear(this.icon);
+            Utils.networkMonitor.unlisten(this.icon);
+            this.icon.destroy();
+            this.icon = undefined;
+        }
         if (this.bars) {
             Config.clear(this.bars);
             Utils.networkMonitor.unlisten(this.bars);
+            this.bars.destroy();
+            this.bars = undefined;
         }
         if (this.graph) {
             Config.clear(this.graph);
             Utils.networkMonitor.unlisten(this.graph);
+            this.graph.destroy();
+            this.graph = undefined;
         }
         if (this.speedContainer) {
             Config.clear(this.speedContainer);
             Utils.networkMonitor.unlisten(this.speedContainer);
+            this.speedContainer = undefined;
+        }
+        if (this.speed) {
+            Config.clear(this.speed);
+            Utils.networkMonitor.unlisten(this.speed);
+            this.speed = undefined;
+        }
+        if (this.tooltipItem) {
+            Config.clear(this.tooltipItem);
+            Utils.networkMonitor.unlisten(this.tooltipItem);
+            this.tooltipItem.destroy();
+            this.tooltipItem = undefined;
         }
         if (this.tooltipMenu) {
             Config.clear(this.tooltipMenu);
             Utils.networkMonitor.unlisten(this.tooltipMenu);
             this.tooltipMenu.close(false);
+            Main.uiGroup.remove_child(this.tooltipMenu.actor);
+            this.tooltipMenu.destroy();
+            this.tooltipMenu = undefined;
         }
         super.destroy();
     }

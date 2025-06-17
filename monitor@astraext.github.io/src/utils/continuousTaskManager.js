@@ -26,8 +26,7 @@ export default class ContinuousTaskManager {
         this.listeners = new Map();
     }
     start(command, options) {
-        if (this.currentTask)
-            this.currentTask.cancel();
+        this.stop();
         this.currentTask = new CancellableTaskManager();
         this.command = command;
         this.options = options;
@@ -160,10 +159,14 @@ export default class ContinuousTaskManager {
         this.listeners.set(subject, callback);
     }
     unlisten(subject) {
-        this.listeners.delete(subject);
+        if (this.listeners.has(subject)) {
+            this.listeners.delete(subject);
+        }
     }
     startTimer() {
         this.stopTimer();
+        if (!this.options?.flush?.interval)
+            return;
         const time = this.options?.flush?.idle ?? this.options?.flush?.interval ?? 1000;
         this.timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, time, () => {
             if (this.output.length > 0) {
@@ -176,19 +179,21 @@ export default class ContinuousTaskManager {
         });
     }
     stopTimer() {
-        if (this.timerId !== undefined) {
+        if (this.timerId) {
             GLib.source_remove(this.timerId);
             this.timerId = undefined;
         }
     }
     stop() {
         this.stopTimer();
-        if (this.currentTask) {
-            this.currentTask.cancel();
-        }
+        this.currentTask?.cancel();
         this.currentTask = undefined;
     }
     get isRunning() {
         return this.currentTask?.isRunning || false;
+    }
+    destroy() {
+        this.stop();
+        this.listeners.clear();
     }
 }

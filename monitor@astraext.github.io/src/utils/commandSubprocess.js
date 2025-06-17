@@ -5,7 +5,7 @@ export class CommandSubprocess {
         this.subprocess = null;
         this.stdoutStream = null;
         this.stderrStream = null;
-        this.isCleaningUp = false;
+        this.destroyed = false;
     }
     static async run(command, cancellableTaskManager) {
         const commandSubprocess = new CommandSubprocess();
@@ -17,7 +17,7 @@ export class CommandSubprocess {
                 const [ok, argv] = GLib.shell_parse_argv(command);
                 if (!ok || !argv || argv.length === 0) {
                     reject(new Error(`Failed to parse command: "${command}"`));
-                    this.cleanup();
+                    this.destroy();
                     return;
                 }
                 const flags = Gio.SubprocessFlags.STDOUT_PIPE |
@@ -28,20 +28,20 @@ export class CommandSubprocess {
                 try {
                     const init = this.subprocess.init(cancellableTaskManager?.cancellable || null);
                     if (!init) {
-                        reject(new Error('Failed to initialize subprocess'));
-                        this.cleanup();
+                        reject(new Error(`Failed to initialize CommandSubprocess: '${command}'`));
+                        this.destroy();
                         return;
                     }
                 }
                 catch (e) {
-                    reject(new Error(`Failed to initialize subprocess: ${e.message}`));
-                    this.cleanup();
+                    reject(new Error(`Failed to initialize CommandSubprocess: '${command}' - ${e.message}`));
+                    this.destroy();
                     return;
                 }
                 this.stdoutStream = this.subprocess.get_stdout_pipe();
                 this.stderrStream = this.subprocess.get_stderr_pipe();
                 this.subprocess.wait_async(cancellableTaskManager?.cancellable || null, async (_source, res) => {
-                    if (this.isCleaningUp) {
+                    if (this.destroyed) {
                         return;
                     }
                     let stdoutContent = '';
@@ -53,7 +53,7 @@ export class CommandSubprocess {
                         exitStatus = this.subprocess.get_exit_status();
                         if (!success || exitStatus !== 0) {
                             stderrContent = await CommandSubprocess.readAll(this.stderrStream, cancellableTaskManager);
-                            reject(new Error(`Command failed with exit status ${exitStatus}: ${stderrContent}`));
+                            reject(new Error(`CommandSubprocess failed with exit status ${exitStatus}: ${stderrContent}`));
                         }
                         else {
                             stdoutContent = await CommandSubprocess.readAll(this.stdoutStream, cancellableTaskManager);
@@ -66,44 +66,18 @@ export class CommandSubprocess {
                         }
                     }
                     catch (e) {
-                        reject(new Error(`Failed to read subprocess output: ${e.message}`));
+                        reject(new Error(`Failed to read CommandSubprocess output: ${e.message}`));
                     }
                     finally {
-                        this.cleanup();
+                        this.destroy();
                     }
                 });
             }
             catch (e) {
-                reject(new Error(`Failed to run command: ${e.message}`));
-                this.cleanup();
+                reject(new Error(`Failed to run CommandSubprocess: ${e.message}`));
+                this.destroy();
             }
         });
-    }
-    cleanup() {
-        if (this.isCleaningUp) {
-            return;
-        }
-        this.isCleaningUp = true;
-        if (this.subprocess) {
-            this.subprocess.force_exit();
-            this.subprocess = null;
-        }
-        if (this.stdoutStream) {
-            try {
-                this.stdoutStream.close(null);
-            }
-            catch (e) {
-            }
-            this.stdoutStream = null;
-        }
-        if (this.stderrStream) {
-            try {
-                this.stderrStream.close(null);
-            }
-            catch (e) {
-            }
-            this.stderrStream = null;
-        }
     }
     static async readAll(stream, cancellableTaskManager) {
         if (!stream)
@@ -136,6 +110,30 @@ export class CommandSubprocess {
             };
             readChunk();
         });
+    }
+    destroy() {
+        if (this.destroyed) {
+            return;
+        }
+        this.destroyed = true;
+        try {
+            this.subprocess?.force_exit();
+        }
+        catch (e) {
+        }
+        this.subprocess = null;
+        try {
+            this.stdoutStream?.close(null);
+        }
+        catch (e) {
+        }
+        this.stdoutStream = null;
+        try {
+            this.stderrStream?.close(null);
+        }
+        catch (e) {
+        }
+        this.stderrStream = null;
     }
 }
 export default CommandSubprocess;

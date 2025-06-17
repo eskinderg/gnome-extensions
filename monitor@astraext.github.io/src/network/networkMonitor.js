@@ -101,9 +101,9 @@ export default class NetworkMonitor extends Monitor {
             devices: null,
             time: -1,
         };
-        this.updateNetworkIOTask.cancel();
-        this.updateRoutesTask.cancel();
-        this.updateWirelessTask.cancel();
+        this.updateNetworkIOTask?.cancel();
+        this.updateRoutesTask?.cancel();
+        this.updateWirelessTask?.cancel();
     }
     start() {
         super.start();
@@ -753,7 +753,16 @@ export default class NetworkMonitor extends Monitor {
         this.notify('topProcesses');
     }
     destroy() {
+        this.stop();
         Config.clear(this);
+        this.updateNetworkIOTask?.cancel();
+        this.updateNetworkIOTask = undefined;
+        this.updateRoutesTask?.cancel();
+        this.updateRoutesTask = undefined;
+        this.updateWirelessTask?.cancel();
+        this.updateWirelessTask = undefined;
+        this.updateNethogsTask?.destroy();
+        this.updateNethogsTask = undefined;
         super.destroy();
     }
 }

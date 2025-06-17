@@ -22,6 +22,7 @@ import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Utils from './utils/utils.js';
 import Config from './config.js';
+import Signal from './signal.js';
 export default GObject.registerClass(class GraphBase extends St.BoxLayout {
     constructor(params = {}) {
         if (params.width === undefined)
@@ -64,7 +65,7 @@ export default GObject.registerClass(class GraphBase extends St.BoxLayout {
             this.add_child(this.historyChart);
         }
         this.setStyle();
-        this.historyChart.connect('repaint', this.repaint.bind(this));
+        Signal.connect(this.historyChart, 'repaint', this.repaint.bind(this));
         Config.connect(this, 'changed::theme-style', this.setStyle.bind(this));
     }
     buildHistoryGrid() {
@@ -137,6 +138,12 @@ export default GObject.registerClass(class GraphBase extends St.BoxLayout {
     }
     destroy() {
         Config.clear(this);
+        Signal.clear(this.historyChart);
+        this.historyChart?.destroy();
+        this.historyChart = undefined;
+        this.grid?.destroy();
+        this.grid = undefined;
+        this.historyGrid = undefined;
         super.destroy();
     }
 });

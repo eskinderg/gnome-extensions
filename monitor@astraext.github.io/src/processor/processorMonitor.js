@@ -71,14 +71,14 @@ export default class ProcessorMonitor extends Monitor {
                 total: -1,
             };
         }
-        this.topProcessesCache.reset();
+        this.topProcessesCache?.reset();
         this.topProcessesTime = -1;
         this.previousPidsCpuTime = new Map();
-        this.updateCpuUsageTask.cancel();
-        this.updateCoresUsageTask.cancel();
-        this.updateCoresFrequencyTask.cancel();
-        this.updateTopProcessesTask.cancel();
-        this.updateLoadAvgTask.cancel();
+        this.updateCpuUsageTask?.cancel();
+        this.updateCoresUsageTask?.cancel();
+        this.updateCoresFrequencyTask?.cancel();
+        this.updateTopProcessesTask?.cancel();
+        this.updateLoadAvgTask?.cancel();
     }
     start() {
         super.start();
@@ -791,7 +791,21 @@ export default class ProcessorMonitor extends Monitor {
         return true;
     }
     destroy() {
+        this.stop();
         Config.clear(this);
+        this.topProcessesCache?.reset();
+        this.topProcessesCache = undefined;
+        this.updateCpuUsageTask?.cancel();
+        this.updateCpuUsageTask = undefined;
+        this.updateCoresUsageTask?.cancel();
+        this.updateCoresUsageTask = undefined;
+        this.updateCoresFrequencyTask?.cancel();
+        this.updateCoresFrequencyTask = undefined;
+        this.updateTopProcessesTask?.cancel();
+        this.updateTopProcessesTask = undefined;
+        this.updateLoadAvgTask?.cancel();
+        this.updateLoadAvgTask = undefined;
+        this.previousPidsCpuTime.clear();
         super.destroy();
     }
 }

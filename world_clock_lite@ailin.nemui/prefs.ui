@@ -108,10 +108,19 @@
     <child>
       <object class="AdwPreferencesGroup">
         <child>
+          <object class="AdwSwitchRow" id="in-calendar-cb">
+            <property name="title" translatable="yes">Show world clocks in date menu</property>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="AdwPreferencesGroup">
+        <child>
           <object class="AdwActionRow">
             <child>
               <object class="GtkButton" id="open-gnome-clocks">
-                <property name="label">Edit World Clocks in "Clocks"...</property>
+                <property name="label" translatable="yes">Edit World Clocks in "Clocks"...</property>
                 <property name="halign">center</property>
                 <property name="valign">center</property>
               </object>

@@ -7,9 +7,10 @@
   "shell-version": [
     "45",
     "46",
-    "47"
+    "47",
+    "48"
   ],
   "url": "https://github.com/khimaros/smart-auto-move",
   "uuid": "smart-auto-move@khimaros.com",
-  "version": 28
+  "version": 31
 }

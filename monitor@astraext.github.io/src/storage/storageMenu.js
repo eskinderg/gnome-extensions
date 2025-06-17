@@ -364,6 +364,7 @@ export default class StorageMenu extends MenuBase {
             if (!devices.has(id)) {
                 this.deviceSection.remove_child(device.container);
                 this.devices.delete(id);
+                device.bar?.destroy();
                 this.devicesInfoPopup.get(id)?.close(true);
                 this.devicesInfoPopup.get(id)?.destroy();
                 this.devicesInfoPopup.delete(id);
@@ -871,7 +872,7 @@ export default class StorageMenu extends MenuBase {
         Utils.storageMonitor.listen(this, 'storageInfo', this.update.bind(this, 'storageInfo', false));
         Utils.storageMonitor.requestUpdate('storageInfo');
     }
-    async onClose() {
+    onClose() {
         Utils.storageMonitor.unlisten(this, 'storageIO');
         Utils.storageMonitor.unlisten(this, 'detailedStorageIO');
         Utils.storageMonitor.unlisten(this, 'topProcesses');
@@ -1212,8 +1213,26 @@ export default class StorageMenu extends MenuBase {
         }
     }
     destroy() {
-        this.close(true);
-        this.removeAll();
+        Config.clear(this);
+        this.storageActivityPopup?.destroy();
+        this.storageActivityPopup = undefined;
+        this.graph?.destroy();
+        this.graph = undefined;
+        this.topProcessesPopup?.destroy();
+        this.topProcessesPopup = undefined;
+        for (const [id, device] of this.devices.entries()) {
+            device.bar?.destroy();
+            device.bar = undefined;
+            this.devicesInfoPopup.get(id)?.close(true);
+            this.devicesInfoPopup.get(id)?.destroy();
+            this.devicesInfoPopup.delete(id);
+            this.devicesTotalsPopup.get(id)?.close(true);
+            this.devicesTotalsPopup.get(id)?.destroy();
+            this.devicesTotalsPopup.delete(id);
+        }
+        this.deviceSection.remove_all_children();
+        this.deviceSection?.destroy();
+        this.deviceSection = undefined;
         super.destroy();
     }
 }
