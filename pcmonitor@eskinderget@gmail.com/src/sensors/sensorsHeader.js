@@ -339,12 +339,12 @@ export default GObject.registerClass(class SensorsHeader extends Header {
             //     return defaultStyle;
             // return `font-size:${scaledHeight}px;`;
             // return (parseInt(sensor1) > 43 ) ? `font-size:11px; color: red;` : `font-size:11px;` ;
-            if(parseInt(sensor1) > 70) {
+            if(parseInt(sensor1) > 75) {
                   Sound.playCriticalError();
                   const iconStyle = 'margin-left:2px;';
                   this.icon.style = iconStyle + 'color: red;';
               return `font-size:11px; color: red;`;
-            } else if(parseInt(sensor1) > 65) {
+            } else if(parseInt(sensor1) > 70) {
                   Sound.playError();
                   const iconStyle = 'margin-left:2px;';
                   this.icon.style = iconStyle + 'color: red;';

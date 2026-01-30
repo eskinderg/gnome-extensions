@@ -12,104 +12,100 @@ export class CommandSubprocess {
         return commandSubprocess.runCommandInstance(command, cancellableTaskManager);
     }
     async runCommandInstance(command, cancellableTaskManager) {
-        return new Promise((resolve, reject) => {
-            try {
-                const [ok, argv] = GLib.shell_parse_argv(command);
-                if (!ok || !argv || argv.length === 0) {
-                    reject(new Error(`Failed to parse command: "${command}"`));
-                    this.destroy();
-                    return;
-                }
-                const flags = Gio.SubprocessFlags.STDOUT_PIPE |
-                    Gio.SubprocessFlags.STDERR_PIPE |
-                    Gio.SubprocessFlags.INHERIT_FDS;
-                this.subprocess = new Gio.Subprocess({ argv, flags });
-                cancellableTaskManager?.setSubprocess(this.subprocess);
-                try {
-                    const init = this.subprocess.init(cancellableTaskManager?.cancellable || null);
-                    if (!init) {
-                        reject(new Error(`Failed to initialize CommandSubprocess: '${command}'`));
-                        this.destroy();
-                        return;
-                    }
-                }
-                catch (e) {
-                    reject(new Error(`Failed to initialize CommandSubprocess: '${command}' - ${e.message}`));
-                    this.destroy();
-                    return;
-                }
-                this.stdoutStream = this.subprocess.get_stdout_pipe();
-                this.stderrStream = this.subprocess.get_stderr_pipe();
-                this.subprocess.wait_async(cancellableTaskManager?.cancellable || null, async (_source, res) => {
-                    if (this.destroyed) {
-                        return;
-                    }
-                    let stdoutContent = '';
-                    let stderrContent = '';
-                    let exitStatus = -1;
-                    let success = false;
+        const [ok, argv] = GLib.shell_parse_argv(command);
+        if (!ok || !argv || argv.length === 0) {
+            throw new Error(`Failed to parse command: "${command}"`);
+        }
+        const flags = Gio.SubprocessFlags.STDOUT_PIPE |
+            Gio.SubprocessFlags.STDERR_PIPE |
+            Gio.SubprocessFlags.INHERIT_FDS;
+        this.subprocess = new Gio.Subprocess({ argv, flags });
+        cancellableTaskManager?.setSubprocess(this.subprocess);
+        try {
+            const init = this.subprocess.init(cancellableTaskManager?.cancellable || null);
+            if (!init) {
+                throw new Error(`Failed to initialize CommandSubprocess: '${command}'`);
+            }
+        }
+        catch (e) {
+            this.destroy();
+            throw new Error(`Failed to initialize CommandSubprocess: '${command}' - ${e.message}`);
+        }
+        this.stdoutStream = this.subprocess.get_stdout_pipe();
+        this.stderrStream = this.subprocess.get_stderr_pipe();
+        try {
+            const stdoutPromise = CommandSubprocess.readAll(this.stdoutStream, cancellableTaskManager);
+            const stderrPromise = CommandSubprocess.readAll(this.stderrStream, cancellableTaskManager);
+            const waitPromise = new Promise((resolve, reject) => {
+                this.subprocess.wait_async(cancellableTaskManager?.cancellable || null, (_source, res) => {
                     try {
-                        success = this.subprocess.wait_finish(res);
-                        exitStatus = this.subprocess.get_exit_status();
-                        if (!success || exitStatus !== 0) {
-                            stderrContent = await CommandSubprocess.readAll(this.stderrStream, cancellableTaskManager);
-                            reject(new Error(`CommandSubprocess failed with exit status ${exitStatus}: ${stderrContent}`));
+                        if (!this.subprocess.wait_finish(res)) {
+                            reject(new Error('Wait failed'));
                         }
                         else {
-                            stdoutContent = await CommandSubprocess.readAll(this.stdoutStream, cancellableTaskManager);
-                            if (!stdoutContent) {
-                                reject(new Error('No output'));
-                            }
-                            else {
-                                resolve(stdoutContent);
-                            }
+                            resolve(this.subprocess.get_exit_status());
                         }
-                    }
-                    catch (e) {
-                        reject(new Error(`Failed to read CommandSubprocess output: ${e.message}`));
-                    }
-                    finally {
-                        this.destroy();
-                    }
-                });
-            }
-            catch (e) {
-                reject(new Error(`Failed to run CommandSubprocess: ${e.message}`));
-                this.destroy();
-            }
-        });
-    }
-    static async readAll(stream, cancellableTaskManager) {
-        if (!stream)
-            return '';
-        let output = '';
-        const decoder = new TextDecoder('utf-8');
-        const bufferSize = 8192;
-        let pendingRead = false;
-        return new Promise((resolve, reject) => {
-            const readChunk = () => {
-                if (pendingRead)
-                    return;
-                pendingRead = true;
-                stream.read_bytes_async(bufferSize, GLib.PRIORITY_LOW, cancellableTaskManager?.cancellable || null, (_stream, asyncResult) => {
-                    pendingRead = false;
-                    try {
-                        const bytes = stream.read_bytes_finish(asyncResult);
-                        if (!bytes || bytes.get_size() === 0) {
-                            resolve(output);
-                            return;
-                        }
-                        const chunk = decoder.decode(bytes.toArray());
-                        output += chunk;
-                        readChunk();
                     }
                     catch (e) {
                         reject(e);
                     }
                 });
-            };
-            readChunk();
-        });
+            });
+            const [exitStatus, stdoutContent, stderrContent] = await Promise.all([
+                waitPromise,
+                stdoutPromise,
+                stderrPromise,
+            ]);
+            if (exitStatus !== 0) {
+                throw new Error(`CommandSubprocess failed with exit status ${exitStatus}: ${stderrContent}`);
+            }
+            if (!stdoutContent) {
+                throw new Error('No output');
+            }
+            return stdoutContent;
+        }
+        catch (e) {
+            throw new Error(`Failed to run CommandSubprocess: ${e.message}`);
+        }
+        finally {
+            this.destroy();
+        }
+    }
+    static async readAll(stream, cancellableTaskManager) {
+        if (!stream)
+            return '';
+        const chunks = [];
+        let totalLength = 0;
+        const bufferSize = 8192;
+        let bytes = null;
+        do {
+            bytes = await new Promise((resolve, reject) => {
+                stream.read_bytes_async(bufferSize, GLib.PRIORITY_LOW, cancellableTaskManager?.cancellable || null, (_stream, asyncResult) => {
+                    try {
+                        const result = stream.read_bytes_finish(asyncResult);
+                        resolve(result);
+                    }
+                    catch (e) {
+                        reject(e);
+                    }
+                });
+            });
+            if (bytes && bytes.get_size() > 0) {
+                const chunk = bytes.toArray();
+                chunks.push(chunk);
+                totalLength += chunk.length;
+            }
+        } while (bytes && bytes.get_size() > 0);
+        if (totalLength === 0)
+            return '';
+        const fullBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks) {
+            fullBuffer.set(chunk, offset);
+            offset += chunk.length;
+        }
+        const decoder = new TextDecoder('utf-8');
+        return decoder.decode(fullBuffer);
     }
     destroy() {
         if (this.destroyed) {

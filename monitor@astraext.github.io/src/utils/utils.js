@@ -65,6 +65,12 @@ class Utils {
         const updateExplicitZero = () => (Utils.explicitZero = Config.get_boolean('explicit-zero'));
         Config.connect(this, 'changed::explicit-zero', updateExplicitZero);
         updateExplicitZero();
+        const updateExperimentalPsSubprocess = () => {
+            const features = Config.get_json('experimental-features');
+            Utils.experimentalPsSubprocess = features?.includes('ps_subprocess') ?? false;
+        };
+        Config.connect(this, 'changed::experimental-features', updateExperimentalPsSubprocess);
+        updateExperimentalPsSubprocess();
     }
     static clear() {
         for (const task of Utils.lowPriorityTasks) {
@@ -273,6 +279,16 @@ class Utils {
             '/opt/sbin/',
         ]) {
             try {
+                const fullPath = path + command;
+                const program = GLib.find_program_in_path(fullPath);
+                if (program) {
+                    Utils.commandsPath.set(command, path);
+                    return path;
+                }
+                if (GLib.file_test(fullPath, GLib.FileTest.IS_EXECUTABLE)) {
+                    Utils.commandsPath.set(command, path);
+                    return path;
+                }
                 const [result, stdout, stderr] = GLib.spawn_command_line_sync(path + fullCommand);
                 if (result && stdout && (!stderr || !stderr.length)) {
                     Utils.commandsPath.set(command, path);
@@ -476,18 +492,24 @@ class Utils {
         return Utils.commandPathLookup('intel_gpu_top -h') !== false;
     }
     static hasCoresFrequency() {
-        const paths = Utils.generateCpuFreqPaths(1);
-        try {
-            for (const path of paths) {
-                const fileContents = GLib.file_get_contents(path);
-                if (!fileContents || !fileContents[0])
-                    return false;
+        let fileContents = GLib.file_get_contents('/sys/devices/system/cpu/present');
+        if (fileContents && fileContents[0]) {
+            const decoder = new TextDecoder('utf8');
+            const topology = Utils.parseCpuPresentFile(decoder.decode(fileContents[1]));
+            const paths = topology.map(coreId => `/sys/devices/system/cpu/cpu${coreId}/cpufreq/scaling_cur_freq`);
+            try {
+                for (const path of paths) {
+                    fileContents = GLib.file_get_contents(path);
+                    if (!fileContents || !fileContents[0])
+                        return false;
+                }
             }
+            catch (e) {
+                return false;
+            }
+            return true;
         }
-        catch (e) {
-            return false;
-        }
-        return true;
+        return false;
     }
     static hasPs() {
         try {
@@ -497,14 +519,6 @@ class Utils {
         catch (e) {
             return false;
         }
-    }
-    static generateCpuFreqPaths(numCores) {
-        const basePath = '/sys/devices/system/cpu/cpu';
-        const freqPath = '/cpufreq/scaling_cur_freq';
-        const paths = [];
-        for (let i = 0; i < numCores; i++)
-            paths.push(basePath + i + freqPath);
-        return paths;
     }
     static formatBytesPerSec(value, unit, maxNumbers = 2, padded = false) {
         if (!Object.prototype.hasOwnProperty.call(Utils.unitMap, unit))
@@ -645,10 +659,21 @@ class Utils {
         return value;
     }
     static async getCachedHwmonDevicesAsync() {
-        const devices = await Utils.getHwmonDevices();
-        Utils.lastCachedHwmonDevices = Date.now();
-        Utils.cachedHwmonDevices = devices;
-        return Utils.cachedHwmonDevices;
+        if (Utils.hwmonPromise) {
+            return Utils.hwmonPromise;
+        }
+        Utils.hwmonPromise = (async () => {
+            try {
+                const devices = await Utils.getHwmonDevices();
+                Utils.lastCachedHwmonDevices = Date.now();
+                Utils.cachedHwmonDevices = devices;
+                return devices;
+            }
+            finally {
+                Utils.hwmonPromise = null;
+            }
+        })();
+        return Utils.hwmonPromise;
     }
     static getCachedHwmonDevices() {
         if (Utils.lastCachedHwmonDevices + 300000 < Date.now()) {
@@ -1551,14 +1576,6 @@ class Utils {
         });
     }
     static runAsyncCommand(command, task) {
-        if (Utils.experimentalPsSubprocess === undefined) {
-            let features = Config.get_json('experimental-features');
-            Utils.experimentalPsSubprocess = features?.includes('ps_subprocess') ?? false;
-            Config.connect(this, 'changed::experimental-features', () => {
-                features = Config.get_json('experimental-features');
-                Utils.experimentalPsSubprocess = features?.includes('ps_subprocess') ?? false;
-            });
-        }
         if (Utils.experimentalPsSubprocess) {
             return CommandSubprocess.run(command, task);
         }
@@ -2179,6 +2196,21 @@ class Utils {
     static getGpuUUID(gpuInfo) {
         return `${gpuInfo.domain}:${gpuInfo.bus}.${gpuInfo.slot}`;
     }
+    static parseCpuPresentFile(content) {
+        const presentParts = content.trim().split(',');
+        const presentCpus = [];
+        for (const part of presentParts) {
+            if (part.includes('-')) {
+                const [start, end] = part.split('-').map(n => parseInt(n, 10));
+                for (let i = start; i <= end; i++)
+                    presentCpus.push(i);
+            }
+            else {
+                presentCpus.push(parseInt(part, 10));
+            }
+        }
+        return presentCpus;
+    }
 }
 Utils.debug = false;
 Utils.defaultMonitors = ['processor', 'gpu', 'memory', 'storage', 'network', 'sensors'];
@@ -2246,6 +2278,7 @@ Utils.unit4Map = {
     GHz: { base: 1000, mult: 1, labels: ['GHz', 'THz'] },
     THz: { base: 1000, mult: 1, labels: ['THz'] },
 };
+Utils.hwmonPromise = null;
 Utils.sensorsPrefix = ['temp', 'fan', 'in', 'power', 'curr', 'energy', 'pwm', 'freq'];
 Utils.cachedUptimeSeconds = 0;
 Utils.uptimeTimer = 0;

@@ -30,6 +30,7 @@ export const MemMonitor = GObject.registerClass(class MemMonitor extends TopHatM
     menuSwapSize;
     topProcs;
     displayType;
+    absUnits;
     constructor(metadata, gsettings) {
         super('Memory Monitor', metadata, gsettings);
         const gicon = Gio.icon_new_for_string(`${this.metadata.path}/icons/hicolor/scalable/actions/mem-icon-symbolic.svg`);
@@ -54,11 +55,23 @@ export const MemMonitor = GObject.registerClass(class MemMonitor extends TopHatM
         for (let i = 0; i < NumTopProcs; i++) {
             this.topProcs[i] = new TopProc();
         }
-        this.gsettings.bind('show-mem', this, 'visible', Gio.SettingsBindFlags.GET);
-        this.gsettings.connect('changed::mem-display', () => {
+        this.displayType = this.updateDisplayType();
+        let id = this.gsettings.connect('changed::mem-display', () => {
             this.updateDisplayType();
         });
-        this.displayType = this.updateDisplayType();
+        this.settingsSignals.push(id);
+        this.absUnits = gsettings.get_boolean('mem-abs-units');
+        id = this.gsettings.connect('changed::mem-abs-units', (settings) => {
+            this.absUnits = settings.get_boolean('mem-abs-units');
+            this.vitals?.notify('ram-usage');
+            this.vitals?.notify('ram-size-free');
+        });
+        this.settingsSignals.push(id);
+        this.visible = gsettings.get_boolean('show-mem');
+        id = this.gsettings.connect('changed::show-mem', (settings) => {
+            this.visible = settings.get_boolean('show-mem');
+        });
+        this.settingsSignals.push(id);
         this.buildMenu();
         this.addMenuButtons();
         this.updateColor();
@@ -84,48 +97,48 @@ export const MemMonitor = GObject.registerClass(class MemMonitor extends TopHatM
     buildMenu() {
         let label = new St.Label({
             text: _('Memory usage'),
-            style_class: 'menu-header',
+            style_class: 'tophat-menu-header',
         });
         this.addMenuRow(label, 0, 2, 1);
         label = new St.Label({
             text: _('RAM used:'),
-            style_class: 'menu-label',
+            style_class: 'tophat-menu-label',
         });
         this.addMenuRow(label, 0, 1, 1);
         this.menuMemUsage.text = MeterNoVal;
-        this.menuMemUsage.add_style_class_name('menu-value');
+        this.menuMemUsage.add_style_class_name('tophat-menu-value');
         this.addMenuRow(this.menuMemUsage, 1, 1, 1);
         this.addMenuRow(this.menuMemCap, 0, 2, 1);
         this.menuMemSize.text = _(`size ${MeterNoVal}`);
-        this.menuMemSize.add_style_class_name('menu-details align-right menu-section-end');
+        this.menuMemSize.add_style_class_name('tophat-menu-details align-right tophat-menu-section-end');
         this.addMenuRow(this.menuMemSize, 0, 2, 1);
         label = new St.Label({
             text: _('Swap used:'),
-            style_class: 'menu-label',
+            style_class: 'tophat-menu-label',
         });
         this.addMenuRow(label, 0, 1, 1);
         this.menuSwapUsage.text = MeterNoVal;
-        this.menuSwapUsage.add_style_class_name('menu-value');
+        this.menuSwapUsage.add_style_class_name('tophat-menu-value');
         this.addMenuRow(this.menuSwapUsage, 1, 1, 1);
         this.addMenuRow(this.menuSwapCap, 0, 2, 1);
         this.menuSwapSize.text = _(`size ${MeterNoVal}`);
-        this.menuSwapSize.add_style_class_name('menu-details align-right menu-section-end');
+        this.menuSwapSize.add_style_class_name('tophat-menu-details align-right tophat-menu-section-end');
         this.addMenuRow(this.menuSwapSize, 0, 2, 1);
         if (this.historyChart) {
             this.addMenuRow(this.historyChart, 0, 2, 1);
         }
         label = new St.Label({
             text: _('Top processes'),
-            style_class: 'menu-header',
+            style_class: 'tophat-menu-header',
         });
         this.addMenuRow(label, 0, 2, 1);
         for (let i = 0; i < NumTopProcs; i++) {
-            this.topProcs[i].cmd.set_style_class_name('menu-cmd-name');
+            this.topProcs[i].cmd.set_style_class_name('tophat-menu-cmd-name');
             this.addMenuRow(this.topProcs[i].cmd, 0, 1, 1);
             this.topProcs[i].setTooltip();
-            this.topProcs[i].usage.set_style_class_name('menu-cmd-usage');
+            this.topProcs[i].usage.set_style_class_name('tophat-menu-cmd-usage');
             if (i === NumTopProcs - 1) {
-                this.topProcs[i].usage.add_style_class_name('menu-section-end');
+                this.topProcs[i].usage.add_style_class_name('tophat-menu-section-end');
             }
             this.addMenuRow(this.topProcs[i].usage, 1, 1, 1);
         }
@@ -144,12 +157,19 @@ export const MemMonitor = GObject.registerClass(class MemMonitor extends TopHatM
             const total = GBytesToHumanString(vitals.ram_size);
             const free = GBytesToHumanString(vitals.ram_size_free);
             this.menuMemSize.text = _(`${free} available of ${total}`);
+            if (this.absUnits) {
+                const used = GBytesToHumanString(vitals.ram_size - vitals.ram_size_free);
+                this.usage.text = used;
+            }
         });
         this.vitalsSignals.push(id);
         id = vitals.connect('notify::ram-usage', () => {
             // console.log(`ram-usage: ${vitals.ram_usage}`);
             const s = (vitals.ram_usage * 100).toFixed(0) + '%';
-            this.usage.text = s;
+            if (!this.absUnits) {
+                // If we're using absolute units, listen for ram-size-free instead
+                this.usage.text = s;
+            }
             this.menuMemUsage.text = s;
             this.meter.setBarSizes([vitals.ram_usage]);
             this.menuMemCap.setUsage(vitals.ram_usage);
@@ -159,7 +179,7 @@ export const MemMonitor = GObject.registerClass(class MemMonitor extends TopHatM
             // console.log(`swap-size: ${vitals.swap_size}`);
             const total = GBytesToHumanString(vitals.swap_size);
             const free = GBytesToHumanString(vitals.swap_size_free);
-            this.menuMemSize.text = _(`${free} available of ${total}`);
+            this.menuSwapSize.text = _(`${free} available of ${total}`);
         });
         this.vitalsSignals.push(id);
         id = vitals.connect('notify::swap-size-free', () => {

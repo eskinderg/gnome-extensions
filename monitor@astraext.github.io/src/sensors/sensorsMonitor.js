@@ -205,7 +205,7 @@ export default class SensorsMonitor extends Monitor {
                     return true;
             }
             else if (this.prefSensorsSource === 'lm-sensors') {
-                if (service === 'lm_sensors')
+                if (service === 'lm-sensors')
                     return true;
             }
         }

@@ -25,7 +25,7 @@ export var Orientation;
 export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.BoxLayout {
     bars;
     barUsage;
-    orientation;
+    meterOrientation;
     scaleFactor = 1;
     color;
     barWidth; // in pixels
@@ -38,7 +38,7 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
         });
         this.bars = new Array(0);
         this.barUsage = new Array(0);
-        this.orientation = Orientation.Horizontal;
+        this.meterOrientation = Orientation.Horizontal;
         this.color = new Cogl.Color();
         this.barWidth = 8;
         const themeContext = St.ThemeContext.get_for_stage(global.get_stage());
@@ -51,7 +51,7 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
             }
         });
         // themeContext.connect('changed', (source: St.ThemeContext) => {
-        //   console.log('themeContext changed');
+        //   console.debug('themeContext changed');
         // });
         this.connect('notify::height', () => {
             this.setBarSizes(this.barUsage);
@@ -74,7 +74,7 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
                 y_expand: false,
                 width: this.barWidth,
                 height: 1 * this.scaleFactor,
-                style_class: 'meter-bar',
+                style_class: 'tophat-meter-bar',
                 name: 'TopHatMeterBar',
             });
             setBarColor(this.bars[i], this.color);
@@ -110,7 +110,7 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
         return width * this.scaleFactor;
     }
     setOrientation(o) {
-        this.orientation = o;
+        this.meterOrientation = o;
     }
     setBarSizes(n) {
         if (n.length != this.bars.length) {
@@ -119,7 +119,23 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
         const meterHeight = this.get_height();
         const duration = adjustAnimationTime(AnimationDuration);
         for (let i = 0; i < n.length; i++) {
+            if (Number.isNaN(n[i])) {
+                console.warn(`setBarSizes(): n[${i}] is NaN`);
+                return;
+            }
+            if (n[i] < 0) {
+                console.warn(`setBarSizes(): n[${i}] < 0: ${n[i]}`);
+                n[i] = 0;
+            }
+            else if (n[i] > 1) {
+                console.warn(`setBarSizes(): n[${i}] > 1: ${n[i]}`);
+                n[i] = 1;
+            }
             const height = Math.ceil(meterHeight * n[i]);
+            if (Number.isNaN(height)) {
+                console.warn(`setBarSizes(): height is NaN`);
+                return;
+            }
             const curHeight = this.bars[i].height;
             const delta = Math.abs(height - curHeight);
             this.bars[i].remove_transition('scaleHeight');
@@ -174,8 +190,8 @@ export const TopHatMeter = GObject.registerClass(class TopHatMeter extends St.Bo
             b.set_width(this.barWidth);
         }
         for (let i = 0; i < this.bars.length; i++) {
-            this.bars[i].remove_style_class_name('meter-bar');
-            this.bars[i].set_style_class_name('meter-bar');
+            this.bars[i].remove_style_class_name('tophat-meter-bar');
+            this.bars[i].set_style_class_name('tophat-meter-bar');
         }
     }
     destroy() {

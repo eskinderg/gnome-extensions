@@ -130,7 +130,7 @@ export default class Storage {
         }, 'storage-ignored-regex', ignoredSection, '');
         const devices = Utils.getBlockDevicesSync();
         let ignoredDevices = Config.get_json('storage-ignored');
-        if (ignoredDevices === null || !Array.isArray(ignoredDevices))
+        if (!Array.isArray(ignoredDevices))
             ignoredDevices = [];
         const main = Config.get_string('storage-main');
         for (const [id, device] of devices.entries()) {
@@ -159,7 +159,7 @@ export default class Storage {
             }
             toggle.connect('state-set', (_switchObj, state) => {
                 let ignored = Config.get_json('storage-ignored');
-                if (ignored === null || !Array.isArray(ignored))
+                if (!Array.isArray(ignored))
                     ignored = [];
                 if (state) {
                     row.subtitle = _('Ignored');

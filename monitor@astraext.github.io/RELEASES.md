@@ -1,3 +1,41 @@
+# Astra Monitor 38 - TO BE RELEASED
+
+### Bug fixes
+
+-   Fixed a bug where sensors were not being updated correctly when using `lm-sensors` as the source. [[#209](https://github.com/AstraExt/astra-monitor/issues/209)]
+-   Improved settings persistence by ensuring that ignored devices and interfaces are properly saved and restored. [[#185](https://github.com/AstraExt/astra-monitor/issues/185)]
+
+# Astra Monitor 37 - January 2 2026
+
+### New features
+
+-   **Offline CPU Cores**: Now, whenever a CPU core is offline, it will be handled correctly and shown as offline in the processor menu.<br>
+    _Note: Due to a [bug in libgtop](https://gitlab.gnome.org/GNOME/libgtop/-/issues/41#note_2641436), this feature requires `/proc/stat` as the source for "CPU cores usage". Unfortunately, libgtop currently truncates CPU usage data starting from the first offline core it encounters._
+
+### Bug fixes
+
+-   Improved async command execution fixing a potential memory leak. [[#191](https://github.com/AstraExt/astra-monitor/issues/191)][[#181](https://github.com/AstraExt/astra-monitor/issues/181)]
+-   Fixed a bug where continuous processes were not triggering updates correctly. This was causing some features to not work correctly when using continuous processes like `nethogs` and `iotop` for monitoring network and I/O activity of processes. [[#207](https://github.com/AstraExt/astra-monitor/issues/207)]
+-   Optimized command path lookup to improve performance trying to avoid spawning subprocesses when possible.
+-   Fixed GPU monitoring not showing in the processor menu when the GPU header is disabled. [[#189](https://github.com/AstraExt/astra-monitor/issues/189)]
+-   Fixed a bug where switches in preferences were not updating correctly when the value was changed. [[#201](https://github.com/AstraExt/astra-monitor/issues/201)]
+-   Resolved a crash that occurred in the preferences window when selecting a GPU. Also enhanced the display of GPU model names for improved clarity in the preferences interface. [[#159](https://github.com/AstraExt/astra-monitor/issues/159)]
+-   Improved preferences panel initialization and other minor enhancements. [[#183](https://github.com/AstraExt/astra-monitor/issues/183)]
+-   Fixed icons displayed incorrectly in preferences panel.
+-   Updated the testing script to support GNOME 49 environments without X11. Also added a `shell.nix` file to facilitate testing on NixOS.
+
+# Astra Monitor 36 - September 18 2025
+
+### New features
+
+-   **GNOME 49 Support**: Added support for GNOME 49.
+
+# Astra Monitor 35 - August 17 2025
+
+### Bug fixes
+
+-   Fixed empty preferences page when no gpu is selected [[#194](https://github.com/AstraExt/astra-monitor/issues/190)] (Thanks to [@ViscoidOrc](https://github.com/ViscoidOrc) for PR)
+
 # Astra Monitor 34 - April 1 2025
 
 ### New features

@@ -92,6 +92,7 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
     themeContextChanged;
     vitals;
     vitalsSignals;
+    settingsSignals;
     panelStyleChanged;
     constructor(nameText, metadata, gsettings) {
         super(0.5, nameText, false);
@@ -99,6 +100,7 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
         this.metadata = metadata;
         this.gsettings = gsettings;
         this.vitalsSignals = new Array(0);
+        this.settingsSignals = new Array(0);
         this.add_style_class_name('tophat-monitor');
         // We need to add the box as a child to `this` before
         // assigning it to this.box
@@ -134,12 +136,14 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
         });
         this.gsettings.bind('show-icons', this.icon, 'visible', Gio.SettingsBindFlags.GET);
         this.gsettings.bind('show-menu-actions', this.menuActionBox, 'visible', Gio.SettingsBindFlags.GET);
-        this.gsettings.connect('changed::meter-fg-color', () => {
+        let id = this.gsettings.connect('changed::meter-fg-color', () => {
             [this.color, this.useAccentColor] = this.updateColor();
         });
-        this.gsettings.connect('changed::use-system-accent', () => {
+        this.settingsSignals.push(id);
+        id = this.gsettings.connect('changed::use-system-accent', () => {
             [this.color, this.useAccentColor] = this.updateColor();
         });
+        this.settingsSignals.push(id);
         // Listen for accent color changes
         this.themeContext = St.ThemeContext.get_for_stage(global.get_stage());
         this.themeContextChanged = this.themeContext.connect('changed', () => {
@@ -163,7 +167,7 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
         }
         const statusMenu = new PopupMenu.PopupMenuSection();
         const grid = new St.Widget({
-            style_class: 'menu-grid',
+            style_class: 'tophat-menu-grid',
             layout_manager: new Clutter.GridLayout({
                 orientation: Clutter.Orientation.VERTICAL,
             }),
@@ -264,6 +268,9 @@ export const TopHatMonitor = GObject.registerClass(class TopHatMonitor extends P
             this.vitals?.disconnect(id);
         }
         this.vitalsSignals.length = 0;
+        for (const id of this.settingsSignals) {
+            this.gsettings.disconnect(id);
+        }
         if (this.panelStyleChanged > 0) {
             Main.panel.disconnect(this.panelStyleChanged);
             this.panelStyleChanged = 0;

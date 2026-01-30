@@ -72,7 +72,7 @@ class Config {
             throw new Error('Critical: Config.settings is not valid');
         try {
             const value = Config.settings.get_string(key);
-            if (value !== null)
+            if (value !== null && value !== '')
                 return JSON.parse(value);
         }
         catch (e) {

@@ -55,11 +55,11 @@ export const HistoryChart = GObject.registerClass(class HistoryChart extends St.
                 x_expand: true,
                 y_expand: false,
                 y_align: Clutter.ActorAlign.END,
-                style_class: 'chart-bar',
+                style_class: 'tophat-chart-bar',
                 height: 0,
             });
         }
-        this.chart = new St.BoxLayout({ style_class: 'chart' });
+        this.chart = new St.BoxLayout({ style_class: 'tophat-chart' });
         if (this.chartStyle === HistoryStyle.DUAL) {
             this.barsAlt = new Array(MaxHistoryLen);
             for (let i = 0; i < MaxHistoryLen; i++) {
@@ -68,12 +68,12 @@ export const HistoryChart = GObject.registerClass(class HistoryChart extends St.
                     x_expand: true,
                     y_expand: false,
                     y_align: Clutter.ActorAlign.START,
-                    style_class: 'chart-bar chart-bar-alt',
+                    style_class: 'tophat-chart-bar tophat-chart-bar-alt',
                     height: 0,
                 });
             }
             this.chartAlt = new St.BoxLayout({
-                style_class: 'chart chart-stacked-bottom',
+                style_class: 'tophat-chart tophat-chart-stacked-bottom',
             });
         }
         else {
@@ -136,10 +136,24 @@ export const HistoryChart = GObject.registerClass(class HistoryChart extends St.
     }
     update(usage) {
         for (let i = 0; i < this.bars.length; i++) {
-            this.bars[i].height =
-                this.chartHeight * usage[usage.length - i - 1].val();
+            const u = usage[usage.length - i - 1].val();
+            if (u < 0) {
+                console.warn(`update(): usage[${usage.length - i - 1}] < 0: ${u}`);
+            }
+            else if (u > 1) {
+                console.warn(`update(): usage[${usage.length - i - 1} > 1: ${u}]`);
+            }
+            const h = this.chartHeight * u;
+            if (Number.isNaN(h)) {
+                console.warn(`update(): height is NaN`);
+            }
+            this.bars[i].height = h;
         }
-        this.priorActivity = usage;
+        const priorActivity = new Array();
+        for (const u of usage) {
+            priorActivity.push(u.copy());
+        }
+        this.priorActivity = priorActivity;
     }
     updateAlt(usage, max) {
         if (!this.chartAlt || !this.barsAlt) {
@@ -147,18 +161,44 @@ export const HistoryChart = GObject.registerClass(class HistoryChart extends St.
             return;
         }
         for (let i = 0; i < this.bars.length; i++) {
+            let u = usage[usage.length - i - 1].val() / max;
+            let uAlt = usage[usage.length - i - 1].valAlt() / max;
+            if (u < 0) {
+                console.warn(`updateAlt(): usage[${usage.length - i - 1}] < 0: ${u}`);
+                u = 0;
+            }
+            else if (u > 1) {
+                console.warn(`updateAlt(): usage[${usage.length - i - 1} > 1: ${u}]`);
+                u = 1;
+            }
+            if (uAlt < 0) {
+                console.warn(`updateAlt(): usageAlt[${usage.length - i - 1}] < 0: ${uAlt}`);
+                uAlt = 0;
+            }
+            else if (uAlt > 1) {
+                console.warn(`updateAlt(): usageAlt[${usage.length - i - 1} > 1: ${uAlt}]`);
+                uAlt = 1;
+            }
             let height = 0;
             let heightAlt = 0;
             if (max) {
-                height =
-                    this.chartHeight * (usage[usage.length - i - 1].valAlt() / max);
-                heightAlt =
-                    this.chartHeightAlt * (usage[usage.length - i - 1].val() / max);
+                height = this.chartHeight * uAlt;
+                heightAlt = this.chartHeightAlt * u;
+            }
+            if (Number.isNaN(height)) {
+                console.warn(`update(): height is NaN`);
+            }
+            if (Number.isNaN(heightAlt)) {
+                console.warn(`update(): heightAlt is NaN`);
             }
             this.bars[i].height = height;
             this.barsAlt[i].height = heightAlt;
         }
-        this.priorActivityAlt = usage;
+        const priorActivityAlt = new Array();
+        for (const u of usage) {
+            priorActivityAlt.push(u.copy());
+        }
+        this.priorActivityAlt = priorActivityAlt;
         this.priorMax = max;
     }
     setColor(color) {
@@ -185,29 +225,29 @@ export const HistoryChart = GObject.registerClass(class HistoryChart extends St.
             for (const bar of this.barsAlt) {
                 this.chartAlt.add_child(bar);
             }
-            this.chart.add_style_class_name('chart-stacked-top');
+            this.chart.add_style_class_name('tophat-chart-stacked-top');
         }
         const vbox = new St.BoxLayout({ vertical: true, y_expand: true });
         this.lm.attach(vbox, 2, 0, 1, 2);
         this.yLabelTop.text = '100%';
         this.yLabelTop.y_align = Clutter.ActorAlign.START;
         this.yLabelTop.y_expand = true;
-        this.yLabelTop.add_style_class_name('chart-label');
+        this.yLabelTop.add_style_class_name('tophat-chart-label');
         vbox.add_child(this.yLabelTop);
         this.yLabelMiddle.text = '50%';
         this.yLabelMiddle.y_align = Clutter.ActorAlign.CENTER;
         this.yLabelMiddle.y_expand = true;
-        this.yLabelMiddle.add_style_class_name('chart-label');
+        this.yLabelMiddle.add_style_class_name('tophat-chart-label');
         vbox.add_child(this.yLabelMiddle);
         this.yLabelBottom.text = '0%';
         this.yLabelBottom.y_align = Clutter.ActorAlign.END;
         this.yLabelBottom.y_expand = true;
-        this.yLabelBottom.add_style_class_name('chart-label');
+        this.yLabelBottom.add_style_class_name('tophat-chart-label');
         vbox.add_child(this.yLabelBottom);
-        this.xLabelThen.add_style_class_name('chart-label-then');
+        this.xLabelThen.add_style_class_name('tophat-chart-label-then');
         this.lm.attach(this.xLabelThen, 0, 2, 1, 1);
         this.xLabelNow.text = _('now');
-        this.xLabelNow.add_style_class_name('chart-label-now');
+        this.xLabelNow.add_style_class_name('tophat-chart-label-now');
         this.lm.attach(this.xLabelNow, 1, 2, 1, 1);
         const label = new St.Label({ text: '' });
         this.lm.attach(label, 2, 2, 1, 1);

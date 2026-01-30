@@ -103,7 +103,7 @@ export default class Gpu {
             }, {});
             choicesSource.push({ value: data, text: Utils.getGPUModelName(gpu) });
         }
-        PrefsUtils.addDropRow({ title: _('Main GPU') }, choicesSource, 'gpu-main', group, 'json');
+        PrefsUtils.addDropRow({ title: _('Main GPU'), subtitle: _('May require a restart.') }, choicesSource, 'gpu-main', group, 'json');
         generalPage.add(group);
         group = new Adw.PreferencesGroup({ title: _('GPU') });
         for (const gpu of gpus) {

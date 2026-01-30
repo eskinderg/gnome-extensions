@@ -3,6 +3,20 @@
 All notable changes to [TopHat] are listed in this file. The format is loosely
 based on [Keep a Changelog].
 
+## TopHat 23 - October 17, 2025
+
+- Added support for GNOME 49
+
+## TopHat 22 - June 22, 2025
+
+- Added option to display memory usage in GB
+- Fixed temperature sensor detection on older Intel Core CPUs
+- Fixed disk monitor problem with sshfs mounts
+- Fixed scaling problems with history charts
+- Fixed potential CSS namespace clashes
+- Fixed console log flooded by NaN-related errors
+- Added German translation (from [theinfamousben](https://github.com/theinfamousben))
+
 ## TopHat 21 - February 23, 2025
 
 - Added support for GNOME 48

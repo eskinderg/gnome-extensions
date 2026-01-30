@@ -383,11 +383,17 @@ export default class Openbar extends Extension {
                         this.applySectionStyles(sectionList, add);
 
                         const msgHbox = msgbox.get_child_at_index(1); // hbox at botton for dnd and clear buttons
-                        const dndBtn = msgHbox.get_child_at_index(1);
-                        this.applyMenuClass(dndBtn, add);
-                        const toggleSwitch = dndBtn.get_child_at_index(0);
-                        this.applyMenuClass(toggleSwitch, add);
-                        const clearBtn = msgHbox.get_child_at_index(2);
+                        let clearBtn;
+                        if(this.gnomeVersion < 49) {
+                            const dndBtn = msgHbox.get_child_at_index(1);
+                            this.applyMenuClass(dndBtn, add);
+                            const toggleSwitch = dndBtn.get_child_at_index(0);
+                            this.applyMenuClass(toggleSwitch, add);
+                            clearBtn = msgHbox.get_child_at_index(2);
+                        }
+                        else {
+                            clearBtn = msgHbox.get_child_at_index(1);
+                        }
                         this.applyMenuClass(clearBtn, add);
 
                         const vbox = hbox.get_child_at_index(1); // Right Pane/Section vbox for calendar etc

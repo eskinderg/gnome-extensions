@@ -8,9 +8,10 @@
     "45",
     "46",
     "47",
-    "48"
+    "48",
+    "49"
   ],
   "url": "https://github.com/noroadsleft000/gnome-network-stats",
   "uuid": "network-stats@gnome.noroadsleft.xyz",
-  "version": 27
+  "version": 34
 }

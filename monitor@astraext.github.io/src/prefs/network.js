@@ -109,7 +109,7 @@ export default class Network {
         }, 'network-ignored-regex', ignoredSection, '');
         const devices = Utils.getNetworkInterfacesSync();
         let ignoredDevices = Config.get_json('network-ignored');
-        if (ignoredDevices === null || !Array.isArray(ignoredDevices))
+        if (!Array.isArray(ignoredDevices))
             ignoredDevices = [];
         for (const [name] of devices.entries()) {
             const status = !ignoredDevices.includes(name);
@@ -128,7 +128,7 @@ export default class Network {
             });
             toggle.connect('state-set', (_switchObj, state) => {
                 let ignored = Config.get_json('network-ignored');
-                if (ignored === null || !Array.isArray(ignoredDevices))
+                if (!Array.isArray(ignored))
                     ignored = [];
                 if (state) {
                     row.subtitle = _('Ignored');
@@ -136,7 +136,7 @@ export default class Network {
                     if (!ignored.includes(name)) {
                         ignored.push(name);
                     }
-                    Config.set('network-ignored', JSON.stringify(ignored), 'string');
+                    Config.set('network-ignored', ignored, 'json');
                 }
                 else {
                     row.subtitle = _('Active');
@@ -144,7 +144,7 @@ export default class Network {
                     if (ignored.includes(name)) {
                         ignored = ignored.filter((deviceName) => deviceName !== name);
                     }
-                    Config.set('network-ignored', JSON.stringify(ignored), 'string');
+                    Config.set('network-ignored', ignored, 'json');
                 }
             });
             row.add_suffix(toggle);

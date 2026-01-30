@@ -120,6 +120,8 @@ export default class TopHatPrefs extends ExtensionPreferences {
         choices.append(_('Numeric value'));
         choices.append(_('Both meter and value'));
         this.addComboRow(_('Show as'), choices, 'mem-display', group);
+        // Absolute units
+        this.addActionRow(_('Show usage in GB'), 'mem-abs-units', group);
         return page;
     }
     buildDiskPage() {

@@ -21,6 +21,7 @@ import Adw from 'gi://Adw';
 import Gdk from 'gi://Gdk';
 import Gtk from 'gi://Gtk';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import { ExtensionPreferences, gettext as _, } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 import Utils from './src/utils/utils.js';
 import Config from './src/config.js';
@@ -91,7 +92,10 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
                 vexpand: true,
                 hexpand: true,
             });
-            window.set_content(navigation);
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                window.set_content(navigation);
+                return GLib.SOURCE_REMOVE;
+            });
             this.welcome = new Welcome(this);
             this.profiles = new Profiles(this);
             this.visualization = new Visualization(this);
@@ -165,8 +169,9 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         });
         menu.add(welcomeGroup);
         const welcomeBtn = PrefsUtils.addButtonRow({
-            title: _('Welcome'),
+            title: '<b>' + _('Overview') + '</b>',
             iconName: 'am-home-symbolic',
+            useMarkup: true,
         }, welcomeGroup, btn => {
             if (navigation.content !== this.welcome.page)
                 navigation.set_content(this.welcome.page);
@@ -219,7 +224,8 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         }, monitorsGroup, 'menu', expanded => {
             if (expanded && processorsDefaultBtn) {
                 processorsDefaultBtn.activate();
-                processorsDefaultBtn.grab_focus();
+                if (processorsDefaultBtn.get_mapped())
+                    processorsDefaultBtn.grab_focus();
             }
         });
         processorsDefaultBtn = PrefsUtils.addButtonRow({
@@ -253,7 +259,8 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         }, monitorsGroup, 'menu', expanded => {
             if (expanded && gpuDefaultBtn) {
                 gpuDefaultBtn.activate();
-                gpuDefaultBtn.grab_focus();
+                if (gpuDefaultBtn.get_mapped())
+                    gpuDefaultBtn.grab_focus();
             }
         });
         gpuDefaultBtn = PrefsUtils.addButtonRow({
@@ -279,7 +286,8 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         }, monitorsGroup, 'menu', expanded => {
             if (expanded && memoryDefaultBtn) {
                 memoryDefaultBtn.activate();
-                memoryDefaultBtn.grab_focus();
+                if (memoryDefaultBtn.get_mapped())
+                    memoryDefaultBtn.grab_focus();
             }
         });
         memoryDefaultBtn = PrefsUtils.addButtonRow({
@@ -313,7 +321,8 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         }, monitorsGroup, 'menu', expanded => {
             if (expanded && storageDefaultBtn) {
                 storageDefaultBtn.activate();
-                storageDefaultBtn.grab_focus();
+                if (storageDefaultBtn.get_mapped())
+                    storageDefaultBtn.grab_focus();
             }
         });
         storageDefaultBtn = PrefsUtils.addButtonRow({
@@ -347,7 +356,8 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         }, monitorsGroup, 'menu', expanded => {
             if (expanded && networkDefaultBtn) {
                 networkDefaultBtn.activate();
-                networkDefaultBtn.grab_focus();
+                if (networkDefaultBtn.get_mapped())
+                    networkDefaultBtn.grab_focus();
             }
         });
         networkDefaultBtn = PrefsUtils.addButtonRow({
@@ -381,7 +391,8 @@ export default class AstraMonitorPrefs extends ExtensionPreferences {
         }, monitorsGroup, 'menu', expanded => {
             if (expanded && sensorsDefaultBtn) {
                 sensorsDefaultBtn.activate();
-                sensorsDefaultBtn.grab_focus();
+                if (sensorsDefaultBtn.get_mapped())
+                    sensorsDefaultBtn.grab_focus();
             }
         });
         sensorsDefaultBtn = PrefsUtils.addButtonRow({

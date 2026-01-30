@@ -160,6 +160,7 @@ export default class NetworkMonitor extends Monitor {
         if (key === 'topProcesses') {
             if (Utils.nethogsHasCaps()) {
                 if (this.dataSources.networkIO === 'nethogs' ||
+                    this.dataSources.networkIO === 'proc' ||
                     this.dataSources.networkIO === 'auto') {
                     this.startNethogs();
                 }
@@ -674,7 +675,8 @@ export default class NetworkMonitor extends Monitor {
         const path = Utils.commandPathLookup('nethogs -V');
         if (Utils.nethogsHasCaps()) {
             if (path !== false) {
-                const command = `nethogs -tb -d ${interval}`;
+                // const command = `nethogs -tb -d ${interval}`;
+                const command = `nethogs -t -v ${interval}`;
                 this.updateNethogsTask.start(command, {
                     flush: { idle: 100 },
                 });
@@ -713,6 +715,25 @@ export default class NetworkMonitor extends Monitor {
             if (!output.startsWith('Refreshing:')) {
                 return;
             }
+      // console.log(output)
+      console.log(this.parseNethogsOutput(output));
+
+      // this.parseNethogsOutput(output).map(item => {
+      //           const exec = Utils.extractCommandName(item.process.cmd);
+      //           console.log(exec)
+
+      // })
+// const simplified = this.parseNethogsOutput(output).map(item => {
+//   const processName = item.process.split(' ')[0].split('/').pop();
+//   return {
+//     process: processName,
+//     upload: item.upload,
+//     download: item.download
+//   };
+// });
+
+// console.log(simplified);
+
             const lines = output.substring(output.indexOf('\n') + 1).split('\n');
             for (const line of lines) {
                 if (line === '')
@@ -751,14 +772,66 @@ export default class NetworkMonitor extends Monitor {
                 };
                 topProcesses.push({ process, upload, download });
             }
+            
+            this.parseNethogsOutput(output).map(item => {
+              const process =  item.process;
+              const upload = item.upload;
+              const download = item.download;
+                topProcesses.push({ process, upload, download });
+            })
+
             topProcesses.sort((a, b) => b.upload + b.download - (a.upload + a.download));
             topProcesses.splice(NetworkMonitor.TOP_PROCESSES_LIMIT);
         }
         catch (e) {
+          console.log("========================================Error====================================");
+          console.log(e);
         }
         this.setUsageValue('topProcesses', topProcesses);
         this.notify('topProcesses');
     }
+
+parseNethogsOutput(output) {
+    const lines = output.split('\n');
+    const results = [];
+
+    for (const line of lines) {
+        if (
+            line.trim().length === 0 ||
+            line.startsWith('Refreshing:') ||
+            line.startsWith('unknown TCP')
+        ) {
+            continue;
+        }
+
+        // This regex assumes the last two values are upload and download speeds.
+        const match = line.match(/^(.*?)(?:\s+)([\d.]+)\s+([\d.]+)$/);
+        if (match) {
+            const prgrm = match[1].trim();
+            const pidext = prgrm.match(/--crashpad-handler-pid=(\d+)/);
+
+            const pid = null;
+            // if(pidext!=null) {
+            //  pid = pidext[1]; 
+            // }
+            const cmd = prgrm.split(' ')[0].split('/').pop();;
+            const exec = prgrm.split(' ')[0].split('/').pop();
+            // const cmd = prgrm;
+
+            const process = {
+              pid,
+              exec,
+              cmd
+            }
+            const upload = parseFloat(match[2]);
+            const download = parseFloat(match[3]);
+
+            results.push({ process, upload, download });
+        }
+    }
+
+    return results;
+}
     destroy() {
         Config.clear(this);
         super.destroy();

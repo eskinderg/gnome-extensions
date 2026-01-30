@@ -73,25 +73,21 @@ As Astra Monitor is in beta stage of development, we have an ambitious roadmap p
         <th style="text-align:center" colspan="2">Release<br>0/5</th>
     </tr>
     <tr>
-        <th style="text-align:center">Q3 2024</th>
-        <th style="text-align:center">Q4 2024</th>
-        <th style="text-align:center">Q1 2025</th>
-        <th style="text-align:center">Q2 2025</th>
+        <th style="text-align:center">~2026</th>
+        <th style="text-align:center">?</th>
+        <th style="text-align:center">?</th>
     </tr>
     <tr>
-        <td style="text-align:center">✅<br>Root Process Monitoring<br><span style="font-size: 13px;">(storage)</span></td>
         <td style="text-align:center">⌛<br>Help &amp; Doc</td>
         <td style="text-align:center">🔲<br>Themes</td>
         <td style="text-align:center">🔲<br>User Custom Commands</td>
     </tr>
     <tr>
-        <td style="text-align:center">✅<br>Network Process Monitoring</td>
         <td style="text-align:center">🔲<br>Battery Monitoring</td>
         <td style="text-align:center"></td>
         <td style="text-align:center"></td>
     </tr>
     <tr>
-        <td style="text-align:center"></td>
         <td style="text-align:center">🔲<br>Continuous Monitoring Mode</td>
         <td style="text-align:center"></td>
         <td style="text-align:center"></td>
@@ -239,6 +235,56 @@ security.wrappers = {
 ```
 
 _Note: This is an example configuration and may vary depending on your specific NixOS setup. Adjust the configuration as needed for your system._
+
+### GPUs
+
+GPU monitoring is supported for AMD and NVIDIA GPUs. Intel integrated GPUs are not currently supported.
+
+#### AMD GPUs
+
+For users with AMD GPUs (Discrete or Integrated), [amdgpu_top](https://github.com/Umio-Yasuno/amdgpu_top) is required to enable monitoring.
+
+##### Ubuntu / Debian
+
+```bash
+sudo apt install amdgpu_top
+```
+
+##### Fedora
+
+```bash
+sudo dnf install amdgpu_top
+```
+
+##### Arch Linux / Manjaro
+
+```bash
+sudo pacman -S amdgpu_top
+```
+
+##### Rust (Cargo)
+
+If you have `cargo` installed, you can also install it via:
+
+```bash
+cargo install amdgpu_top
+```
+
+##### NixOS
+
+On NixOS, add `amdgpu_top` to your `configuration.nix`:
+
+```nix
+environment.systemPackages = with pkgs; [
+    amdgpu_top
+];
+```
+
+#### NVIDIA GPUs
+
+For NVIDIA GPUs, the `nvidia-smi` tool is required. This tool is typically included with the proprietary NVIDIA drivers.
+
+Please refer to the official documentation of your distribution for instructions on how to install the proprietary NVIDIA drivers.
 
 # Usage
 

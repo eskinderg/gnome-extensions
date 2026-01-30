@@ -57,26 +57,34 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
         for (let i = 0; i < NumTopProcs; i++) {
             this.topProcs[i] = new TopProc();
         }
-        this.gsettings.bind('show-cpu', this, 'visible', Gio.SettingsBindFlags.GET);
         this.showCores = this.gsettings.get_boolean('cpu-show-cores');
-        this.gsettings.connect('changed::cpu-show-cores', (settings) => {
+        let id = this.gsettings.connect('changed::cpu-show-cores', (settings) => {
             this.showCores = settings.get_boolean('cpu-show-cores');
             if (!this.showCores) {
                 this.meter.setNumBars(1);
             }
         });
+        this.settingsSignals.push(id);
         this.sortCores = this.gsettings.get_boolean('cpu-sort-cores');
-        this.gsettings.connect('changed::cpu-sort-cores', (settings) => {
+        id = this.gsettings.connect('changed::cpu-sort-cores', (settings) => {
             this.sortCores = settings.get_boolean('cpu-sort-cores');
         });
+        this.settingsSignals.push(id);
         this.normalizeProcUsage = this.gsettings.get_boolean('cpu-normalize-proc-use');
-        this.gsettings.connect('changed::cpu-normalize-proc-use', (settings) => {
+        id = this.gsettings.connect('changed::cpu-normalize-proc-use', (settings) => {
             this.normalizeProcUsage = settings.get_boolean('cpu-normalize-proc-use');
         });
-        this.gsettings.connect('changed::cpu-display', () => {
+        this.settingsSignals.push(id);
+        this.displayType = this.updateDisplayType();
+        id = this.gsettings.connect('changed::cpu-display', () => {
             this.updateDisplayType();
         });
-        this.displayType = this.updateDisplayType();
+        this.settingsSignals.push(id);
+        this.visible = gsettings.get_boolean('show-cpu');
+        id = this.gsettings.connect('changed::show-cpu', (settings) => {
+            this.visible = settings.get_boolean('show-cpu');
+        });
+        this.settingsSignals.push(id);
         this.buildMenu();
         this.addMenuButtons();
         this.updateColor();
@@ -102,65 +110,65 @@ export const CpuMonitor = GObject.registerClass(class CpuMonitor extends TopHatM
     buildMenu() {
         let label = new St.Label({
             text: _('Processor usage'),
-            style_class: 'menu-header',
+            style_class: 'tophat-menu-header',
         });
         this.addMenuRow(label, 0, 2, 1);
         label = new St.Label({
             text: _('Processor utilization:'),
-            style_class: 'menu-label',
+            style_class: 'tophat-menu-label',
         });
         this.addMenuRow(label, 0, 1, 1);
         this.menuCpuUsage.text = MeterNoVal;
-        this.menuCpuUsage.add_style_class_name('menu-value');
+        this.menuCpuUsage.add_style_class_name('tophat-menu-value');
         this.addMenuRow(this.menuCpuUsage, 1, 1, 1);
-        this.menuCpuCap.add_style_class_name('menu-section-end');
+        this.menuCpuCap.add_style_class_name('tophat-menu-section-end');
         this.addMenuRow(this.menuCpuCap, 0, 2, 1);
         // TODO: if we have multiple sockets, create a section for each
         this.menuCpuModel.text = _(`model ${MeterNoVal}`);
-        this.menuCpuModel.add_style_class_name('menu-label menu-details');
+        this.menuCpuModel.add_style_class_name('tophat-menu-label tophat-menu-details');
         this.menuCpuModel.set_x_expand(true);
         this.addMenuRow(this.menuCpuModel, 0, 2, 1);
         label = new St.Label({
             text: _('Frequency:'),
-            style_class: 'menu-label menu-details',
+            style_class: 'tophat-menu-label tophat-menu-details',
         });
         this.addMenuRow(label, 0, 1, 1);
         this.menuCpuFreq.text = MeterNoVal;
-        this.menuCpuFreq.add_style_class_name('menu-value menu-details');
+        this.menuCpuFreq.add_style_class_name('tophat-menu-value tophat-menu-details');
         this.addMenuRow(this.menuCpuFreq, 1, 1, 1);
         label = new St.Label({
             text: _('Temperature:'),
-            style_class: 'menu-label menu-details menu-section-end',
+            style_class: 'tophat-menu-label tophat-menu-details tophat-menu-section-end',
         });
         this.addMenuRow(label, 0, 1, 1);
         this.menuCpuTemp.text = MeterNoVal;
-        this.menuCpuTemp.add_style_class_name('menu-value menu-details menu-section-end');
+        this.menuCpuTemp.add_style_class_name('tophat-menu-value tophat-menu-details tophat-menu-section-end');
         this.addMenuRow(this.menuCpuTemp, 1, 1, 1);
         if (this.historyChart) {
             this.addMenuRow(this.historyChart, 0, 2, 1);
         }
         label = new St.Label({
             text: _('Top processes'),
-            style_class: 'menu-header',
+            style_class: 'tophat-menu-header',
         });
         this.addMenuRow(label, 0, 2, 1);
         for (let i = 0; i < NumTopProcs; i++) {
-            this.topProcs[i].cmd.set_style_class_name('menu-cmd-name');
+            this.topProcs[i].cmd.set_style_class_name('tophat-menu-cmd-name');
             this.addMenuRow(this.topProcs[i].cmd, 0, 1, 1);
             this.topProcs[i].setTooltip();
-            this.topProcs[i].usage.set_style_class_name('menu-cmd-usage');
+            this.topProcs[i].usage.set_style_class_name('tophat-menu-cmd-usage');
             if (i === NumTopProcs - 1) {
-                this.topProcs[i].usage.add_style_class_name('menu-section-end');
+                this.topProcs[i].usage.add_style_class_name('tophat-menu-section-end');
             }
             this.addMenuRow(this.topProcs[i].usage, 1, 1, 1);
         }
         label = new St.Label({
             text: _('System uptime'),
-            style_class: 'menu-header',
+            style_class: 'tophat-menu-header',
         });
         this.addMenuRow(label, 0, 2, 1);
         this.menuUptime.text = MeterNoVal;
-        this.menuUptime.add_style_class_name('menu-uptime menu-section-end');
+        this.menuUptime.add_style_class_name('tophat-menu-uptime tophat-menu-section-end');
         this.addMenuRow(this.menuUptime, 0, 2, 1);
     }
     bindVitals(vitals) {

@@ -5,12 +5,9 @@
   "original-author": "khimaros",
   "settings-schema": "org.gnome.shell.extensions.smart-auto-move",
   "shell-version": [
-    "45",
-    "46",
-    "47",
     "48"
   ],
   "url": "https://github.com/khimaros/smart-auto-move",
   "uuid": "smart-auto-move@khimaros.com",
-  "version": 31
+  "version": 35
 }

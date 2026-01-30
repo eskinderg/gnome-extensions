@@ -165,7 +165,7 @@ export default class ContinuousTaskManager {
     }
     startTimer() {
         this.stopTimer();
-        if (!this.options?.flush?.interval)
+        if (!this.options?.flush?.interval && !this.options?.flush?.idle)
             return;
         const time = this.options?.flush?.idle ?? this.options?.flush?.interval ?? 1000;
         this.timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, time, () => {
@@ -174,6 +174,10 @@ export default class ContinuousTaskManager {
                     callback({ result: this.output, exit: false });
                 });
                 this.output = '';
+            }
+            if (this.options?.flush?.idle) {
+                this.timerId = undefined;
+                return GLib.SOURCE_REMOVE;
             }
             return GLib.SOURCE_CONTINUE;
         });

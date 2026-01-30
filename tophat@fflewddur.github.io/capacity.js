@@ -21,7 +21,7 @@ export const CapacityBar = GObject.registerClass(class CapacityBar extends BarLe
     color;
     constructor() {
         super({
-            style_class: 'cap-bar slider',
+            style_class: 'tophat-cap-bar slider',
             can_focus: false,
             reactive: false,
             track_hover: true,
@@ -33,6 +33,18 @@ export const CapacityBar = GObject.registerClass(class CapacityBar extends BarLe
         this.color = new Cogl.Color();
     }
     setUsage(usage) {
+        if (Number.isNaN(usage)) {
+            console.warn('setUsage(): usage is NaN');
+            usage = 0;
+        }
+        else if (usage < 0) {
+            console.warn('setUsage(): usage < 0: ' + usage);
+            usage = 0;
+        }
+        else if (usage > 1) {
+            console.warn('setUsage: usage > 1: ' + usage);
+            usage = 1;
+        }
         this.remove_transition('usage');
         const duration = adjustAnimationTime(AnimationDuration);
         if (duration > 0) {

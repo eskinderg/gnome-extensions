@@ -22,6 +22,7 @@ import Adw from 'gi://Adw';
 import Gtk from 'gi://Gtk';
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
+import Pango from 'gi://Pango';
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 import Config from '../config.js';
 import Utils from '../utils/utils.js';
@@ -29,12 +30,8 @@ export default class PrefsUtils {
     static addExpanderRow(props, group, groupTag, callback) {
         const tabs = props.tabs;
         delete props.tabs;
-        if (props.iconName) {
-            if (props.title)
-                props.title = '  ' + props.title;
-            if (props.subtitle)
-                props.subtitle = '  ' + props.subtitle.replace('\n', '\n  ');
-        }
+        const iconName = props.iconName;
+        delete props.iconName;
         const data = {
             ...props,
             useMarkup: true,
@@ -42,6 +39,8 @@ export default class PrefsUtils {
         const section = new Adw.ExpanderRow(data);
         if (tabs)
             section.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(section, iconName);
         section.connect('notify::expanded', widget => {
             if (callback)
                 callback(widget.expanded);
@@ -67,9 +66,13 @@ export default class PrefsUtils {
     static addLabelRow(props, label, group) {
         const tabs = props.tabs;
         delete props.tabs;
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -80,9 +83,13 @@ export default class PrefsUtils {
     static addTextInputRow(props, setting, group, reset) {
         const tabs = props.tabs;
         delete props.tabs;
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -120,15 +127,13 @@ export default class PrefsUtils {
     static addButtonRow(props, group, callback) {
         const tabs = props.tabs;
         delete props.tabs;
-        if (props.iconName) {
-            if (props.title)
-                props.title = '  ' + props.title;
-            if (props.subtitle)
-                props.subtitle = '  ' + props.subtitle.replace('\n', '\n  ');
-        }
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -143,6 +148,7 @@ export default class PrefsUtils {
         delete props.tabs;
         const row = new Adw.ActionRow({
             ...props,
+            title: `🔗 ${props.title}`,
             useMarkup: true,
         });
         if (tabs)
@@ -166,7 +172,7 @@ export default class PrefsUtils {
         delete props.tabs;
         const row = new Adw.ActionRow(props);
         const box = new Gtk.Box({ orientation: Gtk.Orientation.HORIZONTAL, spacing: 10 });
-        const icon = new Gtk.Image({ iconName: iconName });
+        const icon = new Gtk.Image({ iconName: iconName, pixelSize: 16 });
         icon.set_margin_end(10);
         box.append(icon);
         row.add_prefix(box);
@@ -186,15 +192,13 @@ export default class PrefsUtils {
         const readOnly = props.readOnly;
         delete props.tabs;
         delete props.readOnly;
-        if (props.iconName) {
-            if (props.title)
-                props.title = '  ' + props.title;
-            if (props.subtitle)
-                props.subtitle = '  ' + props.subtitle.replace('\n', '\n  ');
-        }
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -209,8 +213,9 @@ export default class PrefsUtils {
             Config.bind(setting, toggle, 'active', Gio.SettingsBindFlags.DEFAULT);
         }
         else {
-            toggle.connect('activate', widget => {
-                setting.set(!widget.active);
+            toggle.connect('state-set', (_widget, state) => {
+                setting.set(state);
+                return false;
             });
             Config.connect(this, 'changed::' + setting.watch, () => {
                 toggle.active = setting.get();
@@ -225,16 +230,14 @@ export default class PrefsUtils {
     static addColorRow(props, setting, group, reset) {
         const tabs = props.tabs;
         delete props.tabs;
-        if (props.iconName) {
-            if (props.title)
-                props.title = '  ' + props.title;
-            if (props.subtitle)
-                props.subtitle = '  ' + props.subtitle.replace('\n', '\n  ');
-        }
+        const iconName = props.iconName;
+        delete props.iconName;
         const isCallback = typeof setting === 'function';
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -288,9 +291,14 @@ export default class PrefsUtils {
     static addDropRow(props, values, setting, group, type = 'int', reset) {
         const tabs = props.tabs;
         delete props.tabs;
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
+        row.add_suffix(new Gtk.Box({ widthRequest: 10 }));
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -307,24 +315,46 @@ export default class PrefsUtils {
             });
             row.add_suffix(resetButton);
         }
+        const factory = new Gtk.SignalListItemFactory();
+        factory.connect('setup', (_factory, item) => {
+            const label = new Gtk.Label({
+                ellipsize: Pango.EllipsizeMode.END,
+                maxWidthChars: 80,
+                halign: Gtk.Align.START,
+            });
+            item.set_child(label);
+        });
+        factory.connect('bind', (_factory, item) => {
+            const label = item.get_child();
+            const value = item.get_item().get_string();
+            label.set_label(value);
+        });
+        const listFactory = new Gtk.SignalListItemFactory();
+        listFactory.connect('setup', (_factory, item) => {
+            const label = new Gtk.Label({
+                halign: Gtk.Align.START,
+            });
+            item.set_child(label);
+        });
+        listFactory.connect('bind', (_factory, item) => {
+            const label = item.get_child();
+            const value = item.get_item().get_string();
+            label.set_label(value);
+        });
         const select = new Gtk.DropDown({
             selected: -1,
             halign: Gtk.Align.END,
             valign: Gtk.Align.CENTER,
             hexpand: false,
             vexpand: false,
+            factory,
+            listFactory,
         });
         row.add_suffix(select);
         row.activatableWidget = select;
         let resetSignal;
         let selectSignal;
         const addChoices = (choices) => {
-            if (resetSignal !== undefined) {
-                resetButton?.disconnect(resetSignal);
-            }
-            if (selectSignal !== undefined) {
-                select.disconnect(selectSignal);
-            }
             let savedValue;
             switch (type) {
                 case 'boolean':
@@ -346,9 +376,6 @@ export default class PrefsUtils {
                     savedValue = Config.get_value(setting);
                     break;
             }
-            const stringList = new Gtk.StringList();
-            for (const choice of choices)
-                stringList.append(choice.text);
             let selected = -1;
             choices.forEach((choice, index) => {
                 let value = choice.value;
@@ -357,9 +384,32 @@ export default class PrefsUtils {
                 if (value === savedValue)
                     selected = index;
             });
+            if (selected >= 0 && select.selected !== selected) {
+                select.selected = selected;
+            }
+            if (choices[selected] && choices[selected].text) {
+                const text = choices[selected].text;
+                select.set_tooltip_text(text);
+                row.set_tooltip_text(text);
+            }
+            else {
+                select.set_tooltip_text('');
+                row.set_tooltip_text('');
+            }
+        };
+        const setupModel = (choices) => {
+            if (resetSignal !== undefined) {
+                resetButton?.disconnect(resetSignal);
+            }
+            if (selectSignal !== undefined) {
+                select.disconnect(selectSignal);
+            }
+            const stringList = new Gtk.StringList();
+            for (const choice of choices)
+                stringList.append(choice.text);
             select.set_model(stringList);
-            select.selected = selected;
             resetSignal = resetButton?.connect('clicked', () => {
+                let selected = -1;
                 choices.forEach((choice, index) => {
                     let value = choice.value;
                     if (type === 'json')
@@ -376,38 +426,45 @@ export default class PrefsUtils {
                         Config.set(setting, selectedChoice.value, type);
                 }
             });
-            if (choices[selected] && choices[selected].text)
-                select.set_tooltip_text(choices[selected].text);
             selectSignal = select.connect('notify::selected', widget => {
                 const selectedIndex = widget.selected;
                 const selectedChoice = choices[selectedIndex];
                 if (selectedChoice !== undefined) {
                     row.set_tooltip_text(selectedChoice.text);
+                    select.set_tooltip_text(selectedChoice.text);
                     if (type === 'json')
                         Config.set(setting, JSON.stringify(selectedChoice.value), 'string');
                     else
                         Config.set(setting, selectedChoice.value, type);
                 }
             });
+            addChoices(choices);
         };
-        const update = () => {
-            if (typeof values === 'function') {
-                values().then(addChoices);
-            }
-            else {
-                addChoices(values);
-            }
-        };
-        update();
-        Config.connect(row, 'changed::' + setting, update);
+        let update;
+        if (Array.isArray(values)) {
+            setupModel(values);
+            update = () => addChoices(values);
+            Config.connect(row, 'changed::' + setting, update);
+        }
+        else {
+            update = () => {
+                values().then(setupModel);
+            };
+            update();
+            Config.connect(row, 'changed::' + setting, update);
+        }
         return { update };
     }
     static addComboRow(props, values, setting, group, type = 'int', reset) {
         const tabs = props.tabs;
         delete props.tabs;
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         if (group.add)
             group.add(row);
         else
@@ -530,12 +587,8 @@ export default class PrefsUtils {
     static addSpinRow(props, setting, group, adj, numeric = true, reset) {
         const tabs = props.tabs;
         delete props.tabs;
-        if (props.iconName) {
-            if (props.title)
-                props.title = '  ' + props.title;
-            if (props.subtitle)
-                props.subtitle = '  ' + props.subtitle.replace('\n', '\n  ');
-        }
+        const iconName = props.iconName;
+        delete props.iconName;
         const adjustment = new Gtk.Adjustment({
             lower: adj.min,
             upper: adj.max,
@@ -546,6 +599,8 @@ export default class PrefsUtils {
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         const spinButton = new Gtk.SpinButton({
             halign: Gtk.Align.END,
             valign: Gtk.Align.CENTER,
@@ -586,15 +641,13 @@ export default class PrefsUtils {
             throw new Error('Metadata not found');
         const tabs = props.tabs;
         delete props.tabs;
-        if (props.iconName) {
-            if (props.title)
-                props.title = '  ' + props.title;
-            if (props.subtitle)
-                props.subtitle = '  ' + props.subtitle.replace('\n', '\n  ');
-        }
+        const iconName = props.iconName;
+        delete props.iconName;
         const row = new Adw.ActionRow(props);
         if (tabs)
             row.add_prefix(new Gtk.Box({ marginStart: tabs * 20 }));
+        if (iconName)
+            PrefsUtils.addIcon(row, iconName);
         const fontButton = new Gtk.FontButton({
             modal: true,
             halign: Gtk.Align.END,
@@ -657,7 +710,7 @@ export default class PrefsUtils {
             buttonUp = new Gtk.Button({ sensitive: false });
             buttonUp.set_opacity(0.0);
         }
-        const upImg = new Gtk.Image({ iconName: 'go-up-symbolic', pixelSize: 12 });
+        const upImg = new Gtk.Image({ iconName: 'go-up-symbolic', pixelSize: 16 });
         buttonUp.set_child(upImg);
         buttonUp.set_margin_top(10);
         buttonUp.set_margin_bottom(10);
@@ -676,7 +729,7 @@ export default class PrefsUtils {
             buttonDown = new Gtk.Button({ sensitive: false });
             buttonDown.set_opacity(0.0);
         }
-        const downImg = new Gtk.Image({ iconName: 'go-down-symbolic', pixelSize: 12 });
+        const downImg = new Gtk.Image({ iconName: 'go-down-symbolic', pixelSize: 16 });
         buttonDown.set_child(downImg);
         buttonDown.set_margin_start(10);
         buttonDown.set_margin_top(10);
@@ -692,5 +745,13 @@ export default class PrefsUtils {
             group.add(row);
         else
             group.add_row(row);
+    }
+    static addIcon(row, iconName) {
+        const icon = new Gtk.Image({
+            iconName,
+            pixelSize: 16,
+            marginEnd: 4,
+        });
+        row.add_prefix(icon);
     }
 }
